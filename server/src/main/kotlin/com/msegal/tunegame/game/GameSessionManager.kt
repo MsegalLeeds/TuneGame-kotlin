@@ -8,15 +8,24 @@ class GameSessionManager(
 ) {
     private val sessions = ConcurrentHashMap<String, GameSession>()
 
-    fun createGame(): String {
-        val gameId = UUID.randomUUID().toString()
+    fun createGame(
+        gameSongs: List<Song> = songs
+    ): String {
 
-        val engine = GameEngine(songs)
+        require(gameSongs.isNotEmpty()) {
+            "Game requires at least one song"
+        }
+
+        val gameId =
+            UUID.randomUUID().toString()
+
+        val engine =
+            GameEngine(gameSongs)
+
         engine.newGame()
 
-        sessions[gameId] = GameSession(
-            engine = engine
-        )
+        sessions[gameId] =
+            GameSession(engine)
 
         return gameId
     }

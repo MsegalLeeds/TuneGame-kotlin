@@ -18,7 +18,9 @@ class SpotifyAuth(
 
         val scopes = listOf(
             "user-modify-playback-state",
-            "user-read-playback-state"
+            "user-read-playback-state",
+            "playlist-read-private",
+            "playlist-read-collaborative"
         ).joinToString(" ")
 
         val url = buildString {

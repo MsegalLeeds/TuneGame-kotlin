@@ -1,7 +1,8 @@
 package com.msegal.tunegame.spotify
 
-interface SpotifyService {
+import com.msegal.tunegame.game.Song
 
+interface SpotifyService {
     suspend fun searchTrack(
         song: String,
         artist: String
@@ -13,4 +14,8 @@ interface SpotifyService {
     )
 
     suspend fun pause()
+
+    suspend fun getPlaylistSongs(
+        playlistId: String
+    ): List<Song>
 }

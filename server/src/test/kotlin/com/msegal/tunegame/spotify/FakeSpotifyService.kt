@@ -1,5 +1,7 @@
 package com.msegal.tunegame.spotify
 
+import com.msegal.tunegame.game.Song
+
 class FakeSpotifyService : SpotifyService {
 
     var lastPlayedUri: String? = null
@@ -28,5 +30,11 @@ class FakeSpotifyService : SpotifyService {
 
     override suspend fun pause() {
         paused = true
+    }
+
+    override suspend fun getPlaylistSongs(
+        playlistId: String
+    ): List<Song> {
+        return emptyList()
     }
 }

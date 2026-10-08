@@ -26,7 +26,8 @@ data class AnswerRequest(
 data class PublicQuestion(
     val question: String,
     val choices: List<String>,
-    val type: QuestionType
+    val type: QuestionType,
+    val albumArtUrl: String? = null
 )
 @Serializable
 data class ErrorResponse(
@@ -41,4 +42,8 @@ data class CreatePlaylistRequest(
 data class CreateScoreRequest(
     val playerName: String,
     val gameId: String
+)
+@Serializable
+data class NewGameRequest(
+    val playlistId: String? = null
 )

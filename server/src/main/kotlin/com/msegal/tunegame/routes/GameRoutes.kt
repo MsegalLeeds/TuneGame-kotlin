@@ -8,14 +8,73 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import com.msegal.tunegame.playlist.PlaylistRepository
 
 fun Route.gameRoutes(
     sessionManager: GameSessionManager,
-    spotifyService: SpotifyService
+    spotifyService: SpotifyService,
+    playlistRepository: PlaylistRepository
 ) {
 
     post("/new-game") {
-        val gameId = sessionManager.createGame()
+
+        val request =
+            try {
+                call.receiveNullable<NewGameRequest>()
+            } catch (e: Exception) {
+                null
+            }
+
+        val playlistId =
+            request?.playlistId
+
+        val gameId =
+            if (playlistId == null) {
+
+                // Normal built-in song list
+                sessionManager.createGame()
+
+            } else {
+
+                val playlist =
+                    playlistRepository.get(playlistId)
+
+                if (playlist == null) {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ErrorResponse("Playlist not found")
+                    )
+                    return@post
+                }
+
+                val songs =
+                    try {
+                        spotifyService.getPlaylistSongs(
+                            playlist.spotifyPlaylistId
+                        )
+                    } catch (e: Exception) {
+                        call.respond(
+                            HttpStatusCode.ServiceUnavailable,
+                            ErrorResponse(
+                                e.message
+                                    ?: "Unable to load Spotify playlist"
+                            )
+                        )
+                        return@post
+                    }
+
+                if (songs.size < 4) {
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        ErrorResponse(
+                            "Playlist needs at least 4 songs"
+                        )
+                    )
+                    return@post
+                }
+
+                sessionManager.createGame(songs)
+            }
 
         val session =
             sessionManager.getGame(gameId)
@@ -72,6 +131,8 @@ fun Route.gameRoutes(
             song = generated.song
         )
 
+        var albumArtUrl: String? = null
+
         try {
             val track =
                 spotifyService.searchTrack(
@@ -80,6 +141,8 @@ fun Route.gameRoutes(
                 )
 
             if (track != null) {
+                albumArtUrl = track.albumArtUrl
+
                 spotifyService.playTrack(
                     trackUri = track.uri,
                     positionMs = 30_000
@@ -95,7 +158,8 @@ fun Route.gameRoutes(
             PublicQuestion(
                 question = generated.question.question,
                 choices = generated.question.choices,
-                type = generated.question.type
+                type = generated.question.type,
+                albumArtUrl = albumArtUrl
             )
 
         call.respond(

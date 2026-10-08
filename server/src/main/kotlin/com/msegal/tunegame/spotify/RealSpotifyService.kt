@@ -10,6 +10,10 @@ import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
+import com.msegal.tunegame.game.Song
+import io.ktor.client.call.*
+import io.ktor.client.request.*
+import io.ktor.http.*
 
 class RealSpotifyService(
     private val client: HttpClient,
@@ -56,7 +60,8 @@ class RealSpotifyService(
             name = track.name,
             artist = track.artists
                 .joinToString(", ") { it.name },
-            uri = track.uri
+            uri = track.uri,
+            albumArtUrl = track.album.images.firstOrNull()?.url
         )
     }
 
@@ -103,5 +108,70 @@ class RealSpotifyService(
                 "Spotify pause failed: ${response.status}"
             )
         }
+    }
+
+    override suspend fun getPlaylistSongs(
+        playlistId: String
+    ): List<Song> {
+
+        val token =
+            accessToken()
+                ?: error("Spotify is not connected")
+
+        val songs =
+            mutableListOf<Song>()
+
+        var offset = 0
+        val limit = 50
+
+        do {
+            val response =
+                client.get(
+                    "https://api.spotify.com/v1/playlists/$playlistId/items"
+                ) {
+                    bearerAuth(token)
+
+                    parameter(
+                        "limit",
+                        limit
+                    )
+
+                    parameter(
+                        "offset",
+                        offset
+                    )
+                }
+
+            if (!response.status.isSuccess()) {
+                error(
+                    "Spotify playlist request failed: ${response.status}"
+                )
+            }
+
+            val page =
+                response.body<SpotifyPlaylistItemsResponse>()
+
+            page.items
+                .mapNotNull { it.item }
+                .forEach { track ->
+
+                    val artist =
+                        track.artists
+                            .joinToString(", ") {
+                                it.name
+                            }
+
+                    songs += Song(
+                        song = track.name,
+                        album = track.album.name,
+                        artist = artist
+                    )
+                }
+
+            offset += limit
+
+        } while (page.next != null)
+
+        return songs.distinct()
     }
 }

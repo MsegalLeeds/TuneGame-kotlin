@@ -17,7 +17,20 @@ data class SpotifyTrackItem(
     val id: String,
     val name: String,
     val uri: String,
-    val artists: List<SpotifyArtist>
+    val artists: List<SpotifyArtist>,
+    val album: SpotifyAlbum
+)
+
+@Serializable
+data class SpotifyAlbum(
+    val images: List<SpotifyImage>
+)
+
+@Serializable
+data class SpotifyImage(
+    val url: String,
+    val height: Int? = null,
+    val width: Int? = null
 )
 
 @Serializable

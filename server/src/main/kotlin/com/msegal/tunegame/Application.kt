@@ -5,6 +5,8 @@ import com.msegal.tunegame.game.*
 import com.msegal.tunegame.repository.SongRepository
 import com.msegal.tunegame.spotify.*
 
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpMethod
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -21,6 +23,7 @@ import com.msegal.tunegame.routes.playlistRoutes
 import com.msegal.tunegame.routes.scoreRoutes
 import com.msegal.tunegame.routes.gameRoutes
 import com.msegal.tunegame.routes.spotifyRoutes
+import io.ktor.server.plugins.cors.routing.CORS
 
 fun main() {
     embeddedServer(
@@ -56,6 +59,12 @@ fun Application.module(
 ) {
     install(ServerContentNegotiation) {
         json()
+    }
+
+    install(CORS) {
+        anyHost()
+        allowHeader(HttpHeaders.ContentType)
+        allowMethod(HttpMethod.Delete)
     }
 
     val sessionManager = GameSessionManager(songs)
@@ -119,7 +128,8 @@ fun Application.module(
 
         gameRoutes(
             sessionManager = sessionManager,
-            spotifyService = spotifyService
+            spotifyService = spotifyService,
+            playlistRepository = playlistRepository
         )
 
         playlistRoutes(
