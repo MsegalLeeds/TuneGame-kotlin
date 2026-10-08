@@ -18,6 +18,7 @@ import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerCon
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import com.msegal.tunegame.playlist.PlaylistRepository
 
 fun main() {
     embeddedServer(
@@ -56,6 +57,8 @@ fun Application.module(
     }
 
     val sessionManager = GameSessionManager(songs)
+
+    val playlistRepository = PlaylistRepository()
 
     /*
      * Spotify is optional.
@@ -189,6 +192,85 @@ fun Application.module(
 
             call.respondText(
                 "Playing ${track.name} by ${track.artist}"
+            )
+        }
+
+        get("/playlist") {
+            call.respond(
+                playlistRepository.getAll()
+            )
+        }
+
+        post("/playlist") {
+            val request =
+                call.receive<CreatePlaylistRequest>()
+
+            if (
+                request.name.isBlank() ||
+                request.spotifyPlaylistId.isBlank()
+            ) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        "name and spotifyPlaylistId are required"
+                    )
+                )
+                return@post
+            }
+
+            try {
+                val playlist =
+                    playlistRepository.create(
+                        name = request.name,
+                        spotifyPlaylistId =
+                            request.spotifyPlaylistId
+                    )
+
+                call.respond(
+                    HttpStatusCode.Created,
+                    playlist
+                )
+
+            } catch (e: IllegalStateException) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        e.message ?: "Unable to create playlist"
+                    )
+                )
+            }
+        }
+
+        delete("/playlist/{id}") {
+
+            val id =
+                call.parameters["id"]
+
+            if (id == null) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        "Playlist id is required"
+                    )
+                )
+                return@delete
+            }
+
+            val deleted =
+                playlistRepository.delete(id)
+
+            if (!deleted) {
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    ErrorResponse(
+                        "Playlist not found"
+                    )
+                )
+                return@delete
+            }
+
+            call.respond(
+                HttpStatusCode.NoContent
             )
         }
 

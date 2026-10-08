@@ -1,6 +1,5 @@
 package com.msegal.tunegame.api
 
-import com.msegal.tunegame.game.Question
 import kotlinx.serialization.Serializable
 import com.msegal.tunegame.game.QuestionType
 
@@ -32,4 +31,9 @@ data class PublicQuestion(
 @Serializable
 data class ErrorResponse(
     val error: String
+)
+@Serializable
+data class CreatePlaylistRequest(
+    val name: String,
+    val spotifyPlaylistId: String
 )

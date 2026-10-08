@@ -145,4 +145,102 @@ class ApplicationTest {
         // The answer must remain server-side
         assertFalse(body.contains("\"correctAnswer\""))
     }
+
+    @Test
+    fun `playlist can be created`() = testApplication {
+
+        application {
+            module(testSongs)
+        }
+
+        val response = client.post("/playlist") {
+            contentType(ContentType.Application.Json)
+
+            setBody(
+                """
+            {
+                "name": "Classic Rock",
+                "spotifyPlaylistId": "spotify123"
+            }
+            """.trimIndent()
+            )
+        }
+
+        assertEquals(
+            HttpStatusCode.Created,
+            response.status
+        )
+
+        val body = response.bodyAsText()
+
+        assertTrue(
+            body.contains("\"name\":\"Classic Rock\"")
+        )
+
+        assertTrue(
+            body.contains(
+                "\"spotifyPlaylistId\":\"spotify123\""
+            )
+        )
+    }
+
+    @Test
+    fun `playlist endpoint lists created playlists`() = testApplication {
+
+        application {
+            module(testSongs)
+        }
+
+        client.post("/playlist") {
+            contentType(ContentType.Application.Json)
+
+            setBody(
+                """
+            {
+                "name": "Classic Rock",
+                "spotifyPlaylistId": "spotify123"
+            }
+            """.trimIndent()
+            )
+        }
+
+        val response =
+            client.get("/playlist")
+
+        assertEquals(
+            HttpStatusCode.OK,
+            response.status
+        )
+
+        assertTrue(
+            response.bodyAsText()
+                .contains("\"name\":\"Classic Rock\"")
+        )
+    }
+
+    @Test
+    fun `playlist with blank name is rejected`() = testApplication {
+
+        application {
+            module(testSongs)
+        }
+
+        val response = client.post("/playlist") {
+            contentType(ContentType.Application.Json)
+
+            setBody(
+                """
+            {
+                "name": "",
+                "spotifyPlaylistId": "spotify123"
+            }
+            """.trimIndent()
+            )
+        }
+
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            response.status
+        )
+    }
 }
