@@ -243,4 +243,109 @@ class ApplicationTest {
             response.status
         )
     }
+    @Test
+    fun `score can be submitted`() = testApplication {
+        application {
+            module(testSongs)
+        }
+
+        val response = client.post("/scores") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+            {
+                "playerName": "Marc",
+                "score": 150
+            }
+            """.trimIndent()
+            )
+        }
+
+        assertEquals(
+            HttpStatusCode.Created,
+            response.status
+        )
+
+        val body = response.bodyAsText()
+
+        assertTrue(body.contains("\"playerName\":\"Marc\""))
+        assertTrue(body.contains("\"score\":150"))
+    }
+
+    @Test
+    fun `scores are returned highest first`() = testApplication {
+        application {
+            module(testSongs)
+        }
+
+        suspend fun submitScore(
+            name: String,
+            score: Int
+        ) {
+            client.post("/scores") {
+                contentType(ContentType.Application.Json)
+                setBody(
+                    """
+                {
+                    "playerName": "$name",
+                    "score": $score
+                }
+                """.trimIndent()
+                )
+            }
+        }
+
+        submitScore("Low", 50)
+        submitScore("High", 200)
+        submitScore("Middle", 100)
+
+        val response = client.get("/scores")
+
+        assertEquals(
+            HttpStatusCode.OK,
+            response.status
+        )
+
+        val body = response.bodyAsText()
+
+        val highPosition =
+            body.indexOf("\"playerName\":\"High\"")
+
+        val middlePosition =
+            body.indexOf("\"playerName\":\"Middle\"")
+
+        val lowPosition =
+            body.indexOf("\"playerName\":\"Low\"")
+
+        assertTrue(highPosition >= 0)
+        assertTrue(middlePosition >= 0)
+        assertTrue(lowPosition >= 0)
+
+        assertTrue(highPosition < middlePosition)
+        assertTrue(middlePosition < lowPosition)
+    }
+
+    @Test
+    fun `negative score is rejected`() = testApplication {
+        application {
+            module(testSongs)
+        }
+
+        val response = client.post("/scores") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                """
+            {
+                "playerName": "Marc",
+                "score": -100
+            }
+            """.trimIndent()
+            )
+        }
+
+        assertEquals(
+            HttpStatusCode.BadRequest,
+            response.status
+        )
+    }
 }

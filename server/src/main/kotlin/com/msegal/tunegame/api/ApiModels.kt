@@ -37,3 +37,8 @@ data class CreatePlaylistRequest(
     val name: String,
     val spotifyPlaylistId: String
 )
+@Serializable
+data class CreateScoreRequest(
+    val playerName: String,
+    val score: Int
+)

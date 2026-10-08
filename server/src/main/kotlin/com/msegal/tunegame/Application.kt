@@ -19,6 +19,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import com.msegal.tunegame.playlist.PlaylistRepository
+import com.msegal.tunegame.score.ScoreRepository
 
 fun main() {
     embeddedServer(
@@ -59,6 +60,7 @@ fun Application.module(
     val sessionManager = GameSessionManager(songs)
 
     val playlistRepository = PlaylistRepository()
+    val scoreRepository = ScoreRepository()
 
     /*
      * Spotify is optional.
@@ -464,6 +466,49 @@ fun Application.module(
             )
         }
 
+        get("/scores") {
+            call.respond(
+                scoreRepository.getAll()
+            )
+        }
+
+        post("/scores") {
+
+            val request =
+                call.receive<CreateScoreRequest>()
+
+            if (request.playerName.isBlank()) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        "playerName is required"
+                    )
+                )
+                return@post
+            }
+
+            if (request.score < 0) {
+                call.respond(
+                    HttpStatusCode.BadRequest,
+                    ErrorResponse(
+                        "score cannot be negative"
+                    )
+                )
+                return@post
+            }
+
+            val score =
+                scoreRepository.create(
+                    playerName = request.playerName,
+                    score = request.score
+                )
+
+            call.respond(
+                HttpStatusCode.Created,
+                score
+            )
+        }
+
         /*
          * Submit an answer
          */
@@ -540,4 +585,5 @@ fun Application.module(
     println(
         "TuneGame server running on http://localhost:8080"
     )
+
 }
