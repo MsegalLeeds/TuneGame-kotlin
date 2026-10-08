@@ -1,7 +1,8 @@
 package com.msegal.tunegame.spotify
 
 class SpotifyTokenManager(
-    private val tokenService: SpotifyTokenService
+    private val tokenService: SpotifyTokenProvider,
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
     private var token: SpotifyToken? = null
     private var expiresAt: Long = 0L
@@ -10,19 +11,17 @@ class SpotifyTokenManager(
         token = newToken
 
         expiresAt =
-            System.currentTimeMillis() +
+            clock() +
                     (newToken.expiresIn * 1000L)
     }
 
     suspend fun getAccessToken(): String? {
         val currentToken = token ?: return null
 
-        // Refresh slightly early so the token doesn't expire
-        // while we're making a Spotify request.
         val refreshEarlyMs = 60_000L
 
         if (
-            System.currentTimeMillis() <
+            clock() <
             expiresAt - refreshEarlyMs
         ) {
             return currentToken.accessToken
@@ -35,8 +34,6 @@ class SpotifyTokenManager(
         val refreshedToken =
             tokenService.refreshToken(refreshToken)
 
-        // Spotify may not return a new refresh token.
-        // If not, keep the existing one.
         val updatedToken =
             if (refreshedToken.refreshToken == null) {
                 refreshedToken.copy(

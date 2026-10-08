@@ -10,9 +10,9 @@ import java.util.Base64
 class SpotifyTokenService(
     private val config: SpotifyConfig,
     private val client: HttpClient
-) {
+) : SpotifyTokenProvider {
 
-    suspend fun exchangeCode(code: String): SpotifyToken {
+    override suspend fun exchangeCode(code: String): SpotifyToken {
 
         val credentials =
             "${config.clientId}:${config.clientSecret}"
@@ -44,7 +44,7 @@ class SpotifyTokenService(
         return response.body()
     }
 
-    suspend fun refreshToken(
+    override suspend fun refreshToken(
         refreshToken: String
     ): SpotifyToken {
 
