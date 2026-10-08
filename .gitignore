@@ -1,0 +1,14 @@
+# Secrets
+.env
+
+# Gradle
+.gradle/
+build/
+**/build/
+
+# IntelliJ
+.idea/
+*.iml
+
+# macOS
+.DS_Store
