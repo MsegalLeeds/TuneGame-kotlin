@@ -3,6 +3,8 @@ package com.msegal.tunegame.game
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class GameSessionTest {
 
@@ -76,5 +78,23 @@ class GameSessionTest {
         assertNull(session.currentSong)
         assertNull(session.currentQuestion)
         assertEquals(0.0, session.elapsedSeconds())
+    }
+
+    @Test
+    fun `score starts as not submitted`() {
+        val engine = GameEngine(songs)
+        val session = GameSession(engine)
+
+        assertFalse(session.scoreSubmitted)
+    }
+
+    @Test
+    fun `score can be marked as submitted`() {
+        val engine = GameEngine(songs)
+        val session = GameSession(engine)
+
+        session.markScoreSubmitted()
+
+        assertTrue(session.scoreSubmitted)
     }
 }

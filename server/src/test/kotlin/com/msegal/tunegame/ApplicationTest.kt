@@ -244,85 +244,74 @@ class ApplicationTest {
         )
     }
     @Test
-    fun `score can be submitted`() = testApplication {
+    fun `unfinished game score cannot be submitted`() = testApplication {
         application {
             module(testSongs)
         }
 
-        val response = client.post("/scores") {
-            contentType(ContentType.Application.Json)
-            setBody(
-                """
-            {
-                "playerName": "Marc",
-                "score": 150
-            }
-            """.trimIndent()
-            )
-        }
+        val newGameResponse =
+            client.post("/new-game")
 
-        assertEquals(
-            HttpStatusCode.Created,
-            response.status
-        )
+        val body =
+            newGameResponse.bodyAsText()
 
-        val body = response.bodyAsText()
+        val gameId =
+            Regex("\"gameId\":\"([^\"]+)\"")
+                .find(body)
+                ?.groupValues
+                ?.get(1)
 
-        assertTrue(body.contains("\"playerName\":\"Marc\""))
-        assertTrue(body.contains("\"score\":150"))
-    }
+        assertTrue(gameId != null)
 
-    @Test
-    fun `scores are returned highest first`() = testApplication {
-        application {
-            module(testSongs)
-        }
-
-        suspend fun submitScore(
-            name: String,
-            score: Int
-        ) {
+        val response =
             client.post("/scores") {
                 contentType(ContentType.Application.Json)
+
                 setBody(
                     """
                 {
-                    "playerName": "$name",
-                    "score": $score
+                    "playerName": "Marc",
+                    "gameId": "$gameId"
                 }
                 """.trimIndent()
                 )
             }
-        }
-
-        submitScore("Low", 50)
-        submitScore("High", 200)
-        submitScore("Middle", 100)
-
-        val response = client.get("/scores")
 
         assertEquals(
-            HttpStatusCode.OK,
+            HttpStatusCode.Conflict,
             response.status
         )
 
-        val body = response.bodyAsText()
+        assertTrue(
+            response.bodyAsText()
+                .contains("Game is not over")
+        )
+    }
 
-        val highPosition =
-            body.indexOf("\"playerName\":\"High\"")
+    @Test
+    fun `score submission rejects unknown game`() = testApplication {
+        application {
+            module(testSongs)
+        }
 
-        val middlePosition =
-            body.indexOf("\"playerName\":\"Middle\"")
+        val response =
+            client.post("/scores") {
+                contentType(ContentType.Application.Json)
 
-        val lowPosition =
-            body.indexOf("\"playerName\":\"Low\"")
+                setBody(
+                    """
+                {
+                    "playerName": "Marc",
+                    "gameId": "fake-game-id"
+                }
+                """.trimIndent()
+                )
+            }
 
-        assertTrue(highPosition >= 0)
-        assertTrue(middlePosition >= 0)
-        assertTrue(lowPosition >= 0)
-
-        assertTrue(highPosition < middlePosition)
-        assertTrue(middlePosition < lowPosition)
+        assertEquals(
+            HttpStatusCode.NotFound,
+            response.status
+        )
     }
 
     @Test
@@ -346,6 +335,137 @@ class ApplicationTest {
         assertEquals(
             HttpStatusCode.BadRequest,
             response.status
+        )
+    }
+
+    @Test
+    fun `finished game score can only be submitted once`() = testApplication {
+        application {
+            module(testSongs)
+        }
+
+        // 1. Create a new game.
+        val newGameResponse = client.post("/new-game")
+
+        assertEquals(
+            HttpStatusCode.OK,
+            newGameResponse.status
+        )
+
+        val newGameBody = newGameResponse.bodyAsText()
+
+        val gameId = Regex("\"gameId\":\"([^\"]+)\"")
+            .find(newGameBody)
+            ?.groupValues
+            ?.get(1)
+
+        assertTrue(gameId != null)
+
+        // 2. Lose all three lives.
+        repeat(3) {
+            val questionResponse =
+                client.get("/question?gameId=$gameId")
+
+            assertEquals(
+                HttpStatusCode.OK,
+                questionResponse.status
+            )
+
+            val answerResponse =
+                client.post("/answer") {
+                    contentType(ContentType.Application.Json)
+
+                    setBody(
+                        """
+                    {
+                        "gameId": "$gameId",
+                        "answer": "THIS IS DEFINITELY NOT THE ANSWER"
+                    }
+                    """.trimIndent()
+                    )
+                }
+
+            assertEquals(
+                HttpStatusCode.OK,
+                answerResponse.status
+            )
+        }
+
+        // 3. The finished game's score can now be submitted.
+        val firstSubmission =
+            client.post("/scores") {
+                contentType(ContentType.Application.Json)
+
+                setBody(
+                    """
+                {
+                    "playerName": "Marc",
+                    "gameId": "$gameId"
+                }
+                """.trimIndent()
+                )
+            }
+
+        assertEquals(
+            HttpStatusCode.Created,
+            firstSubmission.status
+        )
+
+        val firstBody =
+            firstSubmission.bodyAsText()
+
+        assertTrue(
+            firstBody.contains("\"playerName\":\"Marc\"")
+        )
+
+        // All answers were wrong, so the score should be zero.
+        assertTrue(
+            firstBody.contains("\"score\":0")
+        )
+
+        // 4. Try to submit the same game again.
+        val secondSubmission =
+            client.post("/scores") {
+                contentType(ContentType.Application.Json)
+
+                setBody(
+                    """
+                {
+                    "playerName": "Marc Again",
+                    "gameId": "$gameId"
+                }
+                """.trimIndent()
+                )
+            }
+
+        assertEquals(
+            HttpStatusCode.Conflict,
+            secondSubmission.status
+        )
+
+        assertTrue(
+            secondSubmission.bodyAsText()
+                .contains("Score has already been submitted")
+        )
+
+        // 5. Make sure only one leaderboard entry exists.
+        val leaderboard =
+            client.get("/scores")
+
+        assertEquals(
+            HttpStatusCode.OK,
+            leaderboard.status
+        )
+
+        val leaderboardBody =
+            leaderboard.bodyAsText()
+
+        assertTrue(
+            leaderboardBody.contains("\"playerName\":\"Marc\"")
+        )
+
+        assertFalse(
+            leaderboardBody.contains("\"playerName\":\"Marc Again\"")
         )
     }
 }

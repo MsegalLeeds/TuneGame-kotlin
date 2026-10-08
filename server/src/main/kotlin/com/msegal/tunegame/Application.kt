@@ -473,26 +473,48 @@ fun Application.module(
         }
 
         post("/scores") {
-
             val request =
                 call.receive<CreateScoreRequest>()
 
             if (request.playerName.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    ErrorResponse(
-                        "playerName is required"
-                    )
+                    ErrorResponse("playerName is required")
                 )
                 return@post
             }
 
-            if (request.score < 0) {
+            if (request.gameId.isBlank()) {
                 call.respond(
                     HttpStatusCode.BadRequest,
-                    ErrorResponse(
-                        "score cannot be negative"
-                    )
+                    ErrorResponse("gameId is required")
+                )
+                return@post
+            }
+
+            val session =
+                sessionManager.getGame(request.gameId)
+
+            if (session == null) {
+                call.respond(
+                    HttpStatusCode.NotFound,
+                    ErrorResponse("Game not found")
+                )
+                return@post
+            }
+
+            if (!session.engine.state.gameOver) {
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse("Game is not over")
+                )
+                return@post
+            }
+
+            if (session.scoreSubmitted) {
+                call.respond(
+                    HttpStatusCode.Conflict,
+                    ErrorResponse("Score has already been submitted")
                 )
                 return@post
             }
@@ -500,8 +522,10 @@ fun Application.module(
             val score =
                 scoreRepository.create(
                     playerName = request.playerName,
-                    score = request.score
+                    score = session.engine.state.score
                 )
+
+            session.markScoreSubmitted()
 
             call.respond(
                 HttpStatusCode.Created,

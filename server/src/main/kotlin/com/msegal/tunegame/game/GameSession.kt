@@ -7,6 +7,9 @@ class GameSession(
     var currentQuestion: Question? = null
         private set
 
+    var scoreSubmitted: Boolean = false
+        private set
+
     private var questionStartTime: Long? = null
     var currentSong: Song? = null
         private set
@@ -18,6 +21,10 @@ class GameSession(
         currentQuestion = question
         currentSong = song
         questionStartTime = clock()
+    }
+
+    fun markScoreSubmitted() {
+        scoreSubmitted = true
     }
 
     fun elapsedSeconds(): Double {

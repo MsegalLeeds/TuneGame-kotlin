@@ -40,5 +40,5 @@ data class CreatePlaylistRequest(
 @Serializable
 data class CreateScoreRequest(
     val playerName: String,
-    val score: Int
+    val gameId: String
 )
