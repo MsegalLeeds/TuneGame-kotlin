@@ -5,7 +5,7 @@ class FakeSpotifyService : SpotifyService {
     var lastPlayedUri: String? = null
     var paused = false
 
-    override fun searchTrack(
+    override suspend fun searchTrack(
         song: String,
         artist: String
     ): SpotifyTrack? {
@@ -18,7 +18,7 @@ class FakeSpotifyService : SpotifyService {
         )
     }
 
-    override fun playTrack(
+    override suspend fun playTrack(
         trackUri: String,
         positionMs: Int
     ) {
@@ -26,7 +26,7 @@ class FakeSpotifyService : SpotifyService {
         paused = false
     }
 
-    override fun pause() {
+    override suspend fun pause() {
         paused = true
     }
 }

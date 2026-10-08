@@ -2,6 +2,7 @@ package com.msegal.tunegame.api
 
 import com.msegal.tunegame.game.Question
 import kotlinx.serialization.Serializable
+import com.msegal.tunegame.game.QuestionType
 
 @Serializable
 data class NewGameResponse(
@@ -13,7 +14,7 @@ data class NewGameResponse(
 
 @Serializable
 data class QuestionResponse(
-    val question: Question
+    val question: PublicQuestion
 )
 
 @Serializable
@@ -22,6 +23,12 @@ data class AnswerRequest(
     val answer: String
 )
 
+@Serializable
+data class PublicQuestion(
+    val question: String,
+    val choices: List<String>,
+    val type: QuestionType
+)
 @Serializable
 data class ErrorResponse(
     val error: String

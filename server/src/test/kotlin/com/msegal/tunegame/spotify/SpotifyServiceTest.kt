@@ -3,11 +3,12 @@ package com.msegal.tunegame.spotify
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 
 class SpotifyServiceTest {
 
     @Test
-    fun `track can be searched`() {
+    fun `track can be searched`() = runTest {
 
         val spotify = FakeSpotifyService()
 
@@ -28,7 +29,7 @@ class SpotifyServiceTest {
     }
 
     @Test
-    fun `track can be played`() {
+    fun `track can be played`() = runTest {
 
         val spotify = FakeSpotifyService()
 
@@ -43,7 +44,7 @@ class SpotifyServiceTest {
     }
 
     @Test
-    fun `playback can be paused`() {
+    fun `playback can be paused`() = runTest {
 
         val spotify = FakeSpotifyService()
 

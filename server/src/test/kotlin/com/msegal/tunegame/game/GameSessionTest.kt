@@ -13,6 +13,12 @@ class GameSessionTest {
         Song("Roxanne", "Outlandos d'Amour", "The Police")
     )
 
+    private val testSong = Song(
+        song = "Come Together",
+        album = "Abbey Road",
+        artist = "The Beatles"
+    )
+
     @Test
     fun `elapsed time is calculated correctly`() {
 
@@ -30,7 +36,10 @@ class GameSessionTest {
             type = QuestionType.SONG_TO_ARTIST
         )
 
-        session.startQuestion(question)
+        session.startQuestion(
+            question = question,
+            song = testSong
+        )
 
         fakeTime = 5_000_000_000L
 
@@ -57,10 +66,14 @@ class GameSessionTest {
             type = QuestionType.SONG_TO_ARTIST
         )
 
-        session.startQuestion(question)
+        session.startQuestion(
+            question = question,
+            song = testSong
+        )
 
         session.clearQuestion()
 
+        assertNull(session.currentSong)
         assertNull(session.currentQuestion)
         assertEquals(0.0, session.elapsedSeconds())
     }

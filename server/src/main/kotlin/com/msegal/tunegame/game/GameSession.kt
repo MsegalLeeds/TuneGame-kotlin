@@ -8,9 +8,15 @@ class GameSession(
         private set
 
     private var questionStartTime: Long? = null
+    var currentSong: Song? = null
+        private set
 
-    fun startQuestion(question: Question) {
+    fun startQuestion(
+        question: Question,
+        song: Song
+    ) {
         currentQuestion = question
+        currentSong = song
         questionStartTime = clock()
     }
 
@@ -22,6 +28,7 @@ class GameSession(
 
     fun clearQuestion() {
         currentQuestion = null
+        currentSong = null
         questionStartTime = null
     }
 }

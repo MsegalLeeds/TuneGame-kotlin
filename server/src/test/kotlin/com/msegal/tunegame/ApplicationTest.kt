@@ -6,6 +6,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlin.test.*
+import kotlin.test.assertFalse
 
 class ApplicationTest {
 
@@ -97,5 +98,51 @@ class ApplicationTest {
             response.bodyAsText()
                 .contains("Game not found")
         )
+    }
+
+    @Test
+    fun `question response does not expose correct answer`() = testApplication {
+
+        application {
+            module(testSongs)
+        }
+
+        // Create a game
+        val newGameResponse = client.post("/new-game")
+
+        assertEquals(
+            HttpStatusCode.OK,
+            newGameResponse.status
+        )
+
+        val newGameBody = newGameResponse.bodyAsText()
+
+        // Extract the generated game ID
+        val gameId = Regex("\"gameId\":\"([^\"]+)\"")
+            .find(newGameBody)
+            ?.groupValues
+            ?.get(1)
+
+        assertTrue(gameId != null)
+
+        // Request a question
+        val questionResponse = client.get(
+            "/question?gameId=$gameId"
+        )
+
+        assertEquals(
+            HttpStatusCode.OK,
+            questionResponse.status
+        )
+
+        val body = questionResponse.bodyAsText()
+
+        // Public information should be present
+        assertTrue(body.contains("\"question\""))
+        assertTrue(body.contains("\"choices\""))
+        assertTrue(body.contains("\"type\""))
+
+        // The answer must remain server-side
+        assertFalse(body.contains("\"correctAnswer\""))
     }
 }
