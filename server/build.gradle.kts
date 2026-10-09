@@ -26,6 +26,9 @@ dependencies {
     testImplementation("io.ktor:ktor-server-test-host:3.3.0")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
+
+    //SQL
+    implementation("org.xerial:sqlite-jdbc:3.50.3.0")
 }
 
 kotlin {

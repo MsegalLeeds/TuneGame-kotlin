@@ -37,4 +37,10 @@ class FakeSpotifyService : SpotifyService {
     ): List<Song> {
         return emptyList()
     }
+
+    override suspend fun getPlaylistName(
+        playlistId: String
+    ): String {
+        return "Test Playlist"
+    }
 }

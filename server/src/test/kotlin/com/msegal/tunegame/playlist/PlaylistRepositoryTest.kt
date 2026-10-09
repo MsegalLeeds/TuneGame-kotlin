@@ -10,7 +10,9 @@ class PlaylistRepositoryTest {
 
     @Test
     fun `created playlist can be retrieved`() {
-        val repository = PlaylistRepository()
+        val repository = PlaylistRepository(
+            "jdbc:sqlite::memory:"
+        )
 
         val playlist = repository.create(
             name = "Classic Rock",
@@ -29,7 +31,9 @@ class PlaylistRepositoryTest {
 
     @Test
     fun `get all returns created playlists`() {
-        val repository = PlaylistRepository()
+        val repository = PlaylistRepository(
+            "jdbc:sqlite::memory:"
+        )
 
         repository.create(
             name = "Playlist One",
@@ -48,7 +52,9 @@ class PlaylistRepositoryTest {
 
     @Test
     fun `playlist can be deleted`() {
-        val repository = PlaylistRepository()
+        val repository = PlaylistRepository(
+            "jdbc:sqlite::memory:"
+        )
 
         val playlist = repository.create(
             name = "Delete Me",
@@ -67,10 +73,38 @@ class PlaylistRepositoryTest {
 
     @Test
     fun `deleting unknown playlist returns false`() {
-        val repository = PlaylistRepository()
+        val repository = PlaylistRepository(
+            "jdbc:sqlite::memory:"
+        )
 
         assertFalse(
             repository.delete("does-not-exist")
+        )
+    }
+    @Test
+    fun `same Spotify playlist is not duplicated`() {
+        val repository = PlaylistRepository(
+            "jdbc:sqlite::memory:"
+        )
+
+        val first = repository.create(
+            name = "My Playlist",
+            spotifyPlaylistId = "spotify123"
+        )
+
+        val second = repository.create(
+            name = "Different Name",
+            spotifyPlaylistId = "spotify123"
+        )
+
+        assertEquals(
+            first.id,
+            second.id
+        )
+
+        assertEquals(
+            1,
+            repository.getAll().size
         )
     }
 }

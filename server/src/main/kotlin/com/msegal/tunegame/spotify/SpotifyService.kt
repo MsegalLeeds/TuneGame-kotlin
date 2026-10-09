@@ -18,4 +18,8 @@ interface SpotifyService {
     suspend fun getPlaylistSongs(
         playlistId: String
     ): List<Song>
+
+    suspend fun getPlaylistName(
+        playlistId: String
+    ): String
 }

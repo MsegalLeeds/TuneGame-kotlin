@@ -8,7 +8,9 @@ class ScoreRepositoryTest {
 
     @Test
     fun `score can be created`() {
-        val repository = ScoreRepository()
+        val repository = ScoreRepository(
+            databaseUrl = "jdbc:sqlite::memory:"
+        )
 
         val score = repository.create(
             playerName = "Marc",
@@ -21,7 +23,9 @@ class ScoreRepositoryTest {
 
     @Test
     fun `scores are returned highest first`() {
-        val repository = ScoreRepository()
+        val repository = ScoreRepository(
+            databaseUrl = "jdbc:sqlite::memory:"
+        )
 
         repository.create("Player One", 50)
         repository.create("Player Two", 200)
@@ -36,7 +40,9 @@ class ScoreRepositoryTest {
 
     @Test
     fun `blank player name is rejected`() {
-        val repository = ScoreRepository()
+        val repository = ScoreRepository(
+            databaseUrl = "jdbc:sqlite::memory:"
+        )
 
         assertFailsWith<IllegalArgumentException> {
             repository.create("", 100)
@@ -45,7 +51,9 @@ class ScoreRepositoryTest {
 
     @Test
     fun `negative score is rejected`() {
-        val repository = ScoreRepository()
+        val repository = ScoreRepository(
+            databaseUrl = "jdbc:sqlite::memory:"
+        )
 
         assertFailsWith<IllegalArgumentException> {
             repository.create("Marc", -1)

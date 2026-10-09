@@ -7,9 +7,11 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import com.msegal.tunegame.spotify.SpotifyService
 
 fun Route.playlistRoutes(
-    playlistRepository: PlaylistRepository
+    playlistRepository: PlaylistRepository,
+    spotifyService: SpotifyService
 ) {
 
     get("/playlist") {
@@ -36,9 +38,26 @@ fun Route.playlistRoutes(
         }
 
         try {
+            val spotifyName =
+                try {
+                    spotifyService.getPlaylistName(
+                        request.spotifyPlaylistId
+                    )
+                } catch (e: Exception) {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        ErrorResponse(
+                            e.message
+                                ?: "Could not load Spotify playlist"
+                        )
+                    )
+
+                    return@post
+                }
+
             val playlist =
                 playlistRepository.create(
-                    name = request.name,
+                    name = spotifyName,
                     spotifyPlaylistId =
                         request.spotifyPlaylistId
                 )

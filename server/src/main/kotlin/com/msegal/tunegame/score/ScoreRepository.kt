@@ -1,16 +1,69 @@
 package com.msegal.tunegame.score
 
+import java.sql.Connection
+import java.sql.DriverManager
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 
-class ScoreRepository {
+class ScoreRepository(
+    databaseUrl: String = "jdbc:sqlite:tunegame.db"
+) {
 
-    private val scores =
-        ConcurrentHashMap<String, Score>()
+    private val connection: Connection =
+        DriverManager.getConnection(databaseUrl)
+
+    init {
+        createTable()
+    }
+
+    private fun createTable() {
+        connection.createStatement().use { statement ->
+            statement.executeUpdate(
+                """
+                CREATE TABLE IF NOT EXISTS scores (
+                    id TEXT PRIMARY KEY,
+                    player_name TEXT NOT NULL,
+                    score INTEGER NOT NULL
+                )
+                """.trimIndent()
+            )
+        }
+    }
 
     fun getAll(): List<Score> {
-        return scores.values
-            .sortedByDescending { it.score }
+
+        val scores =
+            mutableListOf<Score>()
+
+        connection.prepareStatement(
+            """
+            SELECT
+                id,
+                player_name,
+                score
+            FROM scores
+            ORDER BY score DESC
+            """.trimIndent()
+        ).use { statement ->
+
+            val result =
+                statement.executeQuery()
+
+            while (result.next()) {
+
+                scores += Score(
+                    id =
+                        result.getString("id"),
+                    playerName =
+                        result.getString(
+                            "player_name"
+                        ),
+                    score =
+                        result.getInt("score")
+                )
+            }
+        }
+
+        return scores
     }
 
     fun create(
@@ -18,21 +71,57 @@ class ScoreRepository {
         score: Int
     ): Score {
 
-        require(playerName.isNotBlank()) {
+        require(
+            playerName.isNotBlank()
+        ) {
             "Player name cannot be blank"
         }
 
-        require(score >= 0) {
+        require(
+            score >= 0
+        ) {
             "Score cannot be negative"
         }
 
-        val newScore = Score(
-            id = UUID.randomUUID().toString(),
-            playerName = playerName,
-            score = score
-        )
+        val newScore =
+            Score(
+                id =
+                    UUID.randomUUID()
+                        .toString(),
+                playerName =
+                    playerName,
+                score =
+                    score
+            )
 
-        scores[newScore.id] = newScore
+        connection.prepareStatement(
+            """
+            INSERT INTO scores (
+                id,
+                player_name,
+                score
+            )
+            VALUES (?, ?, ?)
+            """.trimIndent()
+        ).use { statement ->
+
+            statement.setString(
+                1,
+                newScore.id
+            )
+
+            statement.setString(
+                2,
+                newScore.playerName
+            )
+
+            statement.setInt(
+                3,
+                newScore.score
+            )
+
+            statement.executeUpdate()
+        }
 
         return newScore
     }

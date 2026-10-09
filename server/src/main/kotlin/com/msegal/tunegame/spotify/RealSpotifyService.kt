@@ -1,19 +1,16 @@
 package com.msegal.tunegame.spotify
 
+import com.msegal.tunegame.game.Song
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
-import io.ktor.http.isSuccess
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import com.msegal.tunegame.game.Song
-import io.ktor.client.call.*
-import io.ktor.client.request.*
-import io.ktor.http.*
+import io.ktor.http.isSuccess
 
 class RealSpotifyService(
     private val client: HttpClient,
@@ -25,22 +22,31 @@ class RealSpotifyService(
         artist: String
     ): SpotifyTrack? {
 
-        val token = accessToken()
-            ?: error("Spotify is not connected")
+        val token =
+            accessToken()
+                ?: error("Spotify is not connected")
 
-        val response = client.get(
-            "https://api.spotify.com/v1/search"
-        ) {
-            bearerAuth(token)
+        val response =
+            client.get(
+                "https://api.spotify.com/v1/search"
+            ) {
+                bearerAuth(token)
 
-            parameter(
-                "q",
-                "track:$song artist:$artist"
-            )
+                parameter(
+                    "q",
+                    "track:$song artist:$artist"
+                )
 
-            parameter("type", "track")
-            parameter("limit", 1)
-        }
+                parameter(
+                    "type",
+                    "track"
+                )
+
+                parameter(
+                    "limit",
+                    1
+                )
+            }
 
         if (!response.status.isSuccess()) {
             error(
@@ -52,16 +58,26 @@ class RealSpotifyService(
             response.body<SpotifySearchResponse>()
 
         val track =
-            searchResponse.tracks.items.firstOrNull()
+            searchResponse
+                .tracks
+                .items
+                .firstOrNull()
                 ?: return null
 
         return SpotifyTrack(
             id = track.id,
             name = track.name,
-            artist = track.artists
-                .joinToString(", ") { it.name },
+            artist =
+                track.artists
+                    .joinToString(", ") {
+                        it.name
+                    },
             uri = track.uri,
-            albumArtUrl = track.album.images.firstOrNull()?.url
+            albumArtUrl =
+                track.album
+                    .images
+                    .firstOrNull()
+                    ?.url
         )
     }
 
@@ -69,22 +85,30 @@ class RealSpotifyService(
         trackUri: String,
         positionMs: Int
     ) {
-        val token = accessToken()
-            ?: error("Spotify is not connected")
 
-        val response = client.put(
-            "https://api.spotify.com/v1/me/player/play"
-        ) {
-            bearerAuth(token)
-            contentType(ContentType.Application.Json)
+        val token =
+            accessToken()
+                ?: error("Spotify is not connected")
 
-            setBody(
-                SpotifyPlaybackRequest(
-                    uris = listOf(trackUri),
-                    positionMs = positionMs
+        val response =
+            client.put(
+                "https://api.spotify.com/v1/me/player/play"
+            ) {
+                bearerAuth(token)
+
+                contentType(
+                    ContentType.Application.Json
                 )
-            )
-        }
+
+                setBody(
+                    SpotifyPlaybackRequest(
+                        uris =
+                            listOf(trackUri),
+                        positionMs =
+                            positionMs
+                    )
+                )
+            }
 
         if (!response.status.isSuccess()) {
             error(
@@ -94,14 +118,17 @@ class RealSpotifyService(
     }
 
     override suspend fun pause() {
-        val token = accessToken()
-            ?: error("Spotify is not connected")
 
-        val response = client.put(
-            "https://api.spotify.com/v1/me/player/pause"
-        ) {
-            bearerAuth(token)
-        }
+        val token =
+            accessToken()
+                ?: error("Spotify is not connected")
+
+        val response =
+            client.put(
+                "https://api.spotify.com/v1/me/player/pause"
+            ) {
+                bearerAuth(token)
+            }
 
         if (!response.status.isSuccess()) {
             error(
@@ -122,9 +149,11 @@ class RealSpotifyService(
             mutableListOf<Song>()
 
         var offset = 0
+
         val limit = 50
 
         do {
+
             val response =
                 client.get(
                     "https://api.spotify.com/v1/playlists/$playlistId/items"
@@ -152,7 +181,9 @@ class RealSpotifyService(
                 response.body<SpotifyPlaylistItemsResponse>()
 
             page.items
-                .mapNotNull { it.item }
+                .mapNotNull {
+                    it.item
+                }
                 .forEach { track ->
 
                     val artist =
@@ -162,16 +193,53 @@ class RealSpotifyService(
                             }
 
                     songs += Song(
-                        song = track.name,
-                        album = track.album.name,
-                        artist = artist
+                        song =
+                            track.name,
+                        album =
+                            track.album.name,
+                        artist =
+                            artist
                     )
                 }
 
             offset += limit
 
-        } while (page.next != null)
+        } while (
+            page.next != null
+        )
 
         return songs.distinct()
+    }
+
+    override suspend fun getPlaylistName(
+        playlistId: String
+    ): String {
+
+        val token =
+            accessToken()
+                ?: error("Spotify is not connected")
+
+        val response =
+            client.get(
+                "https://api.spotify.com/v1/playlists/$playlistId"
+            ) {
+                bearerAuth(token)
+
+                parameter(
+                    "fields",
+                    "id,name"
+                )
+            }
+
+        if (!response.status.isSuccess()) {
+            error(
+                "Spotify playlist request failed: ${response.status}"
+            )
+        }
+
+        val playlist =
+            response.body<SpotifyPlaylistMetadata>()
+
+        return playlist.name
     }
 }
