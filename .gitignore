@@ -14,6 +14,9 @@ build/
 .DS_Store
 
 # dataBase
-tunegame.db/
-tunegame.db-shm/
+tunegame.db
+tunegame.db-shm
 tunegame.db-wal
+
+# Local Properties
+local.properties
