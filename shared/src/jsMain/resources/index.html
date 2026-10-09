@@ -540,6 +540,27 @@
         }
 
         .fade-in { animation: fadeIn 0.25s ease forwards; }
+        .spotify-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spotify-status {
+            flex: 1;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .spotify-status.connected {
+            color: var(--green);
+        }
+
+        .spotify-status.error {
+            color: var(--red);
+        }
+
+
     </style>
 </head>
 <body>
@@ -585,6 +606,37 @@
             </div>
             <button class="start-btn" id="start-button">play</button>
             <div class="error-msg" id="start-error"></div>
+        </div>
+        <div>
+            <div class="mode-label">
+                spotify account
+            </div>
+
+            <div class="spotify-row">
+                <div
+                        id="spotify-status"
+                        class="spotify-status"
+                >
+                    Checking Spotify...
+                </div>
+
+                <button
+                        id="spotify-connect-btn"
+                        class="mode-btn"
+                        type="button"
+                >
+                    connect
+                </button>
+
+                <button
+                        id="spotify-disconnect-btn"
+                        class="mode-btn"
+                        type="button"
+                        style="display: none;"
+                >
+                    disconnect
+                </button>
+            </div>
         </div>
     </div>
 

@@ -13,12 +13,44 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
+private const val FRONTEND_URL =
+    "http://127.0.0.1:8081"
 fun Route.spotifyRoutes(
     spotifyAuth: SpotifyAuth?,
     spotifyTokenManager: SpotifyTokenManager?,
     spotifyServiceForSession:
         (String) -> SpotifyService
 ) {
+
+    get("/spotify/login") {
+
+        val auth =
+            spotifyAuth
+
+        if (auth == null) {
+            call.respond(
+                HttpStatusCode.ServiceUnavailable,
+                ErrorResponse(
+                    "Spotify is not configured"
+                )
+            )
+            return@get
+        }
+
+        val session =
+            call.getOrCreateUserSession()
+
+        val (url, state) =
+            auth.createAuthorizationRequest(
+                session.id
+            )
+
+        println(
+            "SPOTIFY LOGIN session=${session.id} state=$state"
+        )
+
+        call.respondRedirect(url)
+    }
 
     get("/spotify/callback") {
 
@@ -38,38 +70,27 @@ fun Route.spotifyRoutes(
                     "Spotify is not configured"
                 )
             )
-
             return@get
         }
 
         val error =
             call.request
-                .queryParameters[
-                "error"
-            ]
+                .queryParameters["error"]
 
         if (error != null) {
-            call.respond(
-                HttpStatusCode.BadRequest,
-                ErrorResponse(
-                    "Spotify authorization failed: $error"
-                )
+            call.respondRedirect(
+                "$FRONTEND_URL/?spotify=error"
             )
-
             return@get
         }
 
         val code =
             call.request
-                .queryParameters[
-                "code"
-            ]
+                .queryParameters["code"]
 
         val state =
             call.request
-                .queryParameters[
-                "state"
-            ]
+                .queryParameters["state"]
 
         if (
             code == null ||
@@ -81,18 +102,20 @@ fun Route.spotifyRoutes(
                     "Missing authorization code or state"
                 )
             )
-
             return@get
         }
 
-        val userSession =
+        val session =
             call.getOrCreateUserSession()
+
+        println(
+            "SPOTIFY CALLBACK session=${session.id} state=$state"
+        )
 
         if (
             !auth.validateState(
                 state = state,
-                sessionId =
-                    userSession.id
+                sessionId = session.id
             )
         ) {
             call.respond(
@@ -101,59 +124,95 @@ fun Route.spotifyRoutes(
                     "Invalid Spotify authorization state"
                 )
             )
-
             return@get
         }
 
         try {
-
             tokenManager.exchangeCode(
-                sessionId =
-                    userSession.id,
-                code =
-                    code
+                sessionId = session.id,
+                code = code
             )
-
         } catch (e: Exception) {
 
-            call.respond(
-                HttpStatusCode.ServiceUnavailable,
-                ErrorResponse(
-                    e.message
-                        ?: "Spotify token exchange failed"
-                )
+            call.respondRedirect(
+                "$FRONTEND_URL/?spotify=error"
             )
-
             return@get
         }
 
-        call.respondText(
-            "Spotify connected successfully. " +
-                    "You can close this page."
+        call.respondRedirect(
+            "$FRONTEND_URL/?spotify=connected"
+        )
+    }
+
+    get("/spotify/status") {
+
+        val session =
+            call.getOrCreateUserSession()
+
+        val connected =
+            try {
+                spotifyTokenManager
+                    ?.getAccessToken(
+                        session.id
+                    ) != null
+            } catch (e: Exception) {
+                false
+            }
+
+        call.respond(
+            mapOf(
+                "connected" to connected
+            )
+        )
+    }
+
+    post("/spotify/logout") {
+
+        val session =
+            call.getOrCreateUserSession()
+
+        val tokenManager =
+            spotifyTokenManager
+
+        if (tokenManager == null) {
+            call.respond(
+                HttpStatusCode.ServiceUnavailable,
+                ErrorResponse(
+                    "Spotify is not configured"
+                )
+            )
+            return@post
+        }
+
+        tokenManager.logout(
+            session.id
+        )
+
+        call.respond(
+            mapOf(
+                "connected" to false
+            )
         )
     }
 
     get("/spotify/search") {
 
-        val userSession =
+        val session =
             call.getOrCreateUserSession()
 
         val spotifyService =
             spotifyServiceForSession(
-                userSession.id
+                session.id
             )
 
         val song =
             call.request
-                .queryParameters[
-                "song"
-            ]
+                .queryParameters["song"]
 
         val artist =
             call.request
-                .queryParameters[
-                "artist"
-            ]
+                .queryParameters["artist"]
 
         if (
             song == null ||
@@ -165,7 +224,6 @@ fun Route.spotifyRoutes(
                     "song and artist are required"
                 )
             )
-
             return@get
         }
 
@@ -173,10 +231,8 @@ fun Route.spotifyRoutes(
 
             val track =
                 spotifyService.searchTrack(
-                    song =
-                        song,
-                    artist =
-                        artist
+                    song = song,
+                    artist = artist
                 )
 
             if (track == null) {
@@ -186,13 +242,10 @@ fun Route.spotifyRoutes(
                         "Track not found"
                     )
                 )
-
                 return@get
             }
 
-            call.respond(
-                track
-            )
+            call.respond(track)
 
         } catch (e: Exception) {
 
@@ -208,25 +261,21 @@ fun Route.spotifyRoutes(
 
     post("/spotify/play") {
 
-        val userSession =
+        val session =
             call.getOrCreateUserSession()
 
         val spotifyService =
             spotifyServiceForSession(
-                userSession.id
+                session.id
             )
 
         val song =
             call.request
-                .queryParameters[
-                "song"
-            ]
+                .queryParameters["song"]
 
         val artist =
             call.request
-                .queryParameters[
-                "artist"
-            ]
+                .queryParameters["artist"]
 
         if (
             song == null ||
@@ -238,7 +287,6 @@ fun Route.spotifyRoutes(
                     "song and artist are required"
                 )
             )
-
             return@post
         }
 
@@ -246,10 +294,8 @@ fun Route.spotifyRoutes(
 
             val track =
                 spotifyService.searchTrack(
-                    song =
-                        song,
-                    artist =
-                        artist
+                    song = song,
+                    artist = artist
                 )
 
             if (track == null) {
@@ -259,15 +305,12 @@ fun Route.spotifyRoutes(
                         "Track not found"
                     )
                 )
-
                 return@post
             }
 
             spotifyService.playTrack(
-                trackUri =
-                    track.uri,
-                positionMs =
-                    30_000
+                trackUri = track.uri,
+                positionMs = 30_000
             )
 
             call.respondText(
@@ -288,12 +331,12 @@ fun Route.spotifyRoutes(
 
     post("/spotify/pause") {
 
-        val userSession =
+        val session =
             call.getOrCreateUserSession()
 
         val spotifyService =
             spotifyServiceForSession(
-                userSession.id
+                session.id
             )
 
         try {
@@ -314,53 +357,5 @@ fun Route.spotifyRoutes(
                 )
             )
         }
-    }
-
-    get("/spotify/status") {
-
-        val userSession =
-            call.getOrCreateUserSession()
-
-        val connected =
-            spotifyTokenManager
-                ?.getAccessToken(
-                    userSession.id
-                ) != null
-
-        call.respond(
-            mapOf(
-                "connected" to connected
-            )
-        )
-    }
-
-    post("/spotify/logout") {
-
-        val userSession =
-            call.getOrCreateUserSession()
-
-        val tokenManager =
-            spotifyTokenManager
-
-        if (tokenManager == null) {
-            call.respond(
-                HttpStatusCode.ServiceUnavailable,
-                ErrorResponse(
-                    "Spotify is not configured"
-                )
-            )
-
-            return@post
-        }
-
-        tokenManager.logout(
-            userSession.id
-        )
-
-        call.respond(
-            mapOf(
-                "connected" to false
-            )
-        )
     }
 }

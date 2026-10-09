@@ -18,6 +18,11 @@ data class NewGameResponse(
 )
 
 @Serializable
+data class NewGameRequest(
+    val playlistId: String? = null
+)
+
+@Serializable
 data class PublicQuestion(
     val question: String,
     val choices: List<String>,
@@ -74,10 +79,11 @@ data class CreateScoreRequest(
 )
 
 @Serializable
+data class SpotifyStatusResponse(
+    val connected: Boolean
+)
+
+@Serializable
 data class ErrorResponse(
     val error: String
-)
-@Serializable
-data class NewGameRequest(
-    val playlistId: String? = null
 )

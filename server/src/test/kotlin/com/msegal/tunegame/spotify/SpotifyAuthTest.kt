@@ -15,7 +15,7 @@ class SpotifyAuthTest {
                 clientSecret =
                     "client-secret",
                 redirectUri =
-                    "http://localhost:8080/spotify/callback"
+                    "http://127.0.0.1:8080/spotify/callback"
             )
         )
     }
@@ -33,10 +33,8 @@ class SpotifyAuthTest {
 
         assertTrue(
             auth.validateState(
-                state =
-                    state,
-                sessionId =
-                    "session-a"
+                state = state,
+                sessionId = "session-a"
             )
         )
     }
@@ -54,10 +52,34 @@ class SpotifyAuthTest {
 
         assertFalse(
             auth.validateState(
-                state =
-                    state,
-                sessionId =
-                    "session-b"
+                state = state,
+                sessionId = "session-b"
+            )
+        )
+    }
+
+    @Test
+    fun `wrong session does not consume valid state`() {
+
+        val auth =
+            createAuth()
+
+        val (_, state) =
+            auth.createAuthorizationRequest(
+                "session-a"
+            )
+
+        assertFalse(
+            auth.validateState(
+                state = state,
+                sessionId = "session-b"
+            )
+        )
+
+        assertTrue(
+            auth.validateState(
+                state = state,
+                sessionId = "session-a"
             )
         )
     }
@@ -75,19 +97,60 @@ class SpotifyAuthTest {
 
         assertTrue(
             auth.validateState(
-                state =
-                    state,
-                sessionId =
-                    "session-a"
+                state = state,
+                sessionId = "session-a"
             )
         )
 
         assertFalse(
             auth.validateState(
-                state =
-                    state,
-                sessionId =
-                    "session-a"
+                state = state,
+                sessionId = "session-a"
+            )
+        )
+    }
+
+    @Test
+    fun `different sessions receive independent states`() {
+
+        val auth =
+            createAuth()
+
+        val (_, stateA) =
+            auth.createAuthorizationRequest(
+                "session-a"
+            )
+
+        val (_, stateB) =
+            auth.createAuthorizationRequest(
+                "session-b"
+            )
+
+        assertTrue(
+            auth.validateState(
+                state = stateA,
+                sessionId = "session-a"
+            )
+        )
+
+        assertTrue(
+            auth.validateState(
+                state = stateB,
+                sessionId = "session-b"
+            )
+        )
+    }
+
+    @Test
+    fun `random unknown state is rejected`() {
+
+        val auth =
+            createAuth()
+
+        assertFalse(
+            auth.validateState(
+                state = "not-a-real-state",
+                sessionId = "session-a"
             )
         )
     }

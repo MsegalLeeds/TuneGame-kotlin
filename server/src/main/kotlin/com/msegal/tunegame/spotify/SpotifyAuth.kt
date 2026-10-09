@@ -85,15 +85,10 @@ class SpotifyAuth(
         state: String,
         sessionId: String
     ): Boolean {
-
-        val expectedSession =
-            validStates.remove(
-                state
-            )
-                ?: return false
-
-        return expectedSession ==
-                sessionId
+        return validStates.remove(
+            state,
+            sessionId
+        )
     }
 
     private fun encode(

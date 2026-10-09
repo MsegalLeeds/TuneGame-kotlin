@@ -47,3 +47,7 @@ data class CreateScoreRequest(
 data class NewGameRequest(
     val playlistId: String? = null
 )
+@Serializable
+data class SpotifyStatusResponse(
+    val connected: Boolean
+)

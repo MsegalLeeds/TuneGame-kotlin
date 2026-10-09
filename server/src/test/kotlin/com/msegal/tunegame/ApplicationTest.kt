@@ -818,4 +818,83 @@ class ApplicationTest {
                 response.status
             )
         }
+
+    @Test
+    fun `session cookie preserves same user session`() =
+        testApplication {
+
+            application {
+                module(
+                    songs = testSongs,
+                    spotifyServiceOverride =
+                        FakeSpotifyService(),
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+            }
+
+            val firstResponse =
+                client.get("/session")
+
+            assertEquals(
+                HttpStatusCode.OK,
+                firstResponse.status
+            )
+
+            val firstBody =
+                firstResponse.bodyAsText()
+
+            val firstSessionId =
+                Regex(
+                    "\"sessionId\":\"([^\"]+)\""
+                )
+                    .find(firstBody)
+                    ?.groupValues
+                    ?.get(1)
+
+            assertNotNull(
+                firstSessionId
+            )
+
+            val setCookie =
+                firstResponse.headers[
+                    HttpHeaders.SetCookie
+                ]
+
+            assertNotNull(
+                setCookie
+            )
+
+            val cookie =
+                setCookie.substringBefore(";")
+
+            val secondResponse =
+                client.get("/session") {
+                    header(
+                        HttpHeaders.Cookie,
+                        cookie
+                    )
+                }
+
+            assertEquals(
+                HttpStatusCode.OK,
+                secondResponse.status
+            )
+
+            val secondBody =
+                secondResponse.bodyAsText()
+
+            val secondSessionId =
+                Regex(
+                    "\"sessionId\":\"([^\"]+)\""
+                )
+                    .find(secondBody)
+                    ?.groupValues
+                    ?.get(1)
+
+            assertEquals(
+                firstSessionId,
+                secondSessionId
+            )
+        }
 }

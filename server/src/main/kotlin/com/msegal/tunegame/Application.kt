@@ -77,9 +77,11 @@ fun Application.module(
         ) {
             cookie.path = "/"
             cookie.httpOnly = true
+            cookie.secure = false
+
             cookie.extensions[
                 "SameSite"
-            ] = "lax"
+            ] = "Lax"
         }
     }
 

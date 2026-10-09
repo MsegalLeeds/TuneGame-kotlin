@@ -34,4 +34,10 @@ interface TuneGameApi {
         playerName: String,
         gameId: String
     ): Score
+
+    suspend fun getSpotifyStatus():
+            SpotifyStatusResponse
+
+    suspend fun disconnectSpotify():
+            SpotifyStatusResponse
 }

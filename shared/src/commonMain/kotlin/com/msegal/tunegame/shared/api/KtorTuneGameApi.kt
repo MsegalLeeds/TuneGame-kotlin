@@ -5,8 +5,8 @@ import io.ktor.client.call.body
 import io.ktor.client.request.*
 import io.ktor.client.statement.HttpResponse
 import io.ktor.http.ContentType
-import io.ktor.http.isSuccess
 import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 
 class KtorTuneGameApi(
     private val baseUrl: String,
@@ -36,6 +36,7 @@ class KtorTuneGameApi(
 
         val response =
             client.post("$baseUrl/new-game") {
+
                 contentType(
                     ContentType.Application.Json
                 )
@@ -55,7 +56,9 @@ class KtorTuneGameApi(
     ): QuestionResponse {
 
         val response =
-            client.get("$baseUrl/question") {
+            client.get(
+                "$baseUrl/question"
+            ) {
                 parameter(
                     "gameId",
                     gameId
@@ -71,7 +74,10 @@ class KtorTuneGameApi(
     ): AnswerResult {
 
         val response =
-            client.post("$baseUrl/answer") {
+            client.post(
+                "$baseUrl/answer"
+            ) {
+
                 contentType(
                     ContentType.Application.Json
                 )
@@ -107,6 +113,7 @@ class KtorTuneGameApi(
             client.post(
                 "$baseUrl/playlist"
             ) {
+
                 contentType(
                     ContentType.Application.Json
                 )
@@ -163,6 +170,7 @@ class KtorTuneGameApi(
             client.post(
                 "$baseUrl/scores"
             ) {
+
                 contentType(
                     ContentType.Application.Json
                 )
@@ -176,6 +184,28 @@ class KtorTuneGameApi(
                     )
                 )
             }
+
+        return handleResponse(response)
+    }
+
+    override suspend fun getSpotifyStatus():
+            SpotifyStatusResponse {
+
+        val response =
+            client.get(
+                "$baseUrl/spotify/status"
+            )
+
+        return handleResponse(response)
+    }
+
+    override suspend fun disconnectSpotify():
+            SpotifyStatusResponse {
+
+        val response =
+            client.post(
+                "$baseUrl/spotify/logout"
+            )
 
         return handleResponse(response)
     }

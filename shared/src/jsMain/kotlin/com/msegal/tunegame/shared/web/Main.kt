@@ -34,7 +34,9 @@ private val gameClient =
     GameClient(api)
 
 fun main() {
+
     setupButtons()
+    setupSpotifyUi()
 
     scope.launch {
         loadSavedPlaylists()
