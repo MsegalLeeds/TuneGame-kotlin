@@ -2,6 +2,7 @@ package com.msegal.tunegame.spotify
 
 import java.sql.Connection
 import java.sql.DriverManager
+import kotlin.jvm.Synchronized
 
 class SpotifyTokenRepository(
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
@@ -11,6 +12,12 @@ class SpotifyTokenRepository(
         DriverManager.getConnection(databaseUrl)
 
     init {
+        connection.createStatement().use {
+            it.execute(
+                "PRAGMA busy_timeout = 5000"
+            )
+        }
+
         createTable()
     }
 
@@ -18,8 +25,8 @@ class SpotifyTokenRepository(
         connection.createStatement().use { statement ->
             statement.executeUpdate(
                 """
-                CREATE TABLE IF NOT EXISTS spotify_auth (
-                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                CREATE TABLE IF NOT EXISTS spotify_session_auth (
+                    session_id TEXT PRIMARY KEY,
                     refresh_token TEXT NOT NULL
                 )
                 """.trimIndent()
@@ -27,17 +34,28 @@ class SpotifyTokenRepository(
         }
     }
 
+    @Synchronized
     fun saveRefreshToken(
+        sessionId: String,
         refreshToken: String
     ) {
+
+        require(sessionId.isNotBlank()) {
+            "Session ID cannot be blank"
+        }
+
+        require(refreshToken.isNotBlank()) {
+            "Refresh token cannot be blank"
+        }
+
         connection.prepareStatement(
             """
-            INSERT INTO spotify_auth (
-                id,
+            INSERT INTO spotify_session_auth (
+                session_id,
                 refresh_token
             )
-            VALUES (1, ?)
-            ON CONFLICT(id)
+            VALUES (?, ?)
+            ON CONFLICT(session_id)
             DO UPDATE SET
                 refresh_token = excluded.refresh_token
             """.trimIndent()
@@ -45,6 +63,11 @@ class SpotifyTokenRepository(
 
             statement.setString(
                 1,
+                sessionId
+            )
+
+            statement.setString(
+                2,
                 refreshToken
             )
 
@@ -52,15 +75,23 @@ class SpotifyTokenRepository(
         }
     }
 
-    fun getRefreshToken(): String? {
+    @Synchronized
+    fun getRefreshToken(
+        sessionId: String
+    ): String? {
 
         connection.prepareStatement(
             """
             SELECT refresh_token
-            FROM spotify_auth
-            WHERE id = 1
+            FROM spotify_session_auth
+            WHERE session_id = ?
             """.trimIndent()
         ).use { statement ->
+
+            statement.setString(
+                1,
+                sessionId
+            )
 
             statement.executeQuery().use { results ->
 
@@ -75,14 +106,22 @@ class SpotifyTokenRepository(
         }
     }
 
-    fun deleteRefreshToken(): Boolean {
+    @Synchronized
+    fun deleteRefreshToken(
+        sessionId: String
+    ): Boolean {
 
         connection.prepareStatement(
             """
-            DELETE FROM spotify_auth
-            WHERE id = 1
+            DELETE FROM spotify_session_auth
+            WHERE session_id = ?
             """.trimIndent()
         ).use { statement ->
+
+            statement.setString(
+                1,
+                sessionId
+            )
 
             return statement.executeUpdate() > 0
         }

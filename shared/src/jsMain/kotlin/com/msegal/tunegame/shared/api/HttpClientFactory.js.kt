@@ -8,6 +8,13 @@ import kotlinx.serialization.json.Json
 
 actual fun createHttpClient(): HttpClient =
     HttpClient(Js) {
+
+        engine {
+            configureRequest {
+                credentials = "include"
+            }
+        }
+
         install(ContentNegotiation) {
             json(
                 Json {

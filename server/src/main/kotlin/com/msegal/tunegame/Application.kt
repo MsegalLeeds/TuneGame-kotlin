@@ -9,6 +9,8 @@ import com.msegal.tunegame.routes.playlistRoutes
 import com.msegal.tunegame.routes.scoreRoutes
 import com.msegal.tunegame.routes.spotifyRoutes
 import com.msegal.tunegame.score.ScoreRepository
+import com.msegal.tunegame.session.UserSession
+import com.msegal.tunegame.session.getOrCreateUserSession
 import com.msegal.tunegame.spotify.RealSpotifyService
 import com.msegal.tunegame.spotify.SpotifyAuth
 import com.msegal.tunegame.spotify.SpotifyConfig
@@ -28,9 +30,12 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
+import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.server.sessions.Sessions
+import io.ktor.server.sessions.cookie
 import kotlinx.serialization.json.Json
 
 fun main() {
@@ -44,39 +49,62 @@ fun main() {
 
 const val TIME_LIMIT_SECONDS = 30.0
 
-/*
- * Production entry point.
- *
- * Loads the real songs and Spotify configuration.
- */
 fun Application.module() {
     module(
-        songs = SongRepository().loadSongs(),
-        spotifyConfig = SpotifyConfig.fromEnvironmentOrNull()
+        songs =
+            SongRepository()
+                .loadSongs(),
+        spotifyConfig =
+            SpotifyConfig
+                .fromEnvironmentOrNull()
     )
 }
 
-/*
- * Configurable application module.
- *
- * Tests can supply their own songs and optionally
- * provide a fake Spotify service.
- */
 fun Application.module(
     songs: List<Song>,
     spotifyConfig: SpotifyConfig? = null,
     spotifyServiceOverride: SpotifyService? = null,
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
 ) {
+
     install(ServerContentNegotiation) {
         json()
     }
 
+    install(Sessions) {
+        cookie<UserSession>(
+            "tunegame_session"
+        ) {
+            cookie.path = "/"
+            cookie.httpOnly = true
+            cookie.extensions[
+                "SameSite"
+            ] = "lax"
+        }
+    }
+
     install(CORS) {
-        anyHost()
+
+        allowHost(
+            "localhost:8081",
+            schemes =
+                listOf("http")
+        )
+
+        allowHost(
+            "127.0.0.1:8081",
+            schemes =
+                listOf("http")
+        )
+
+        allowCredentials = true
 
         allowHeader(
             HttpHeaders.ContentType
+        )
+
+        allowMethod(
+            HttpMethod.Post
         )
 
         allowMethod(
@@ -84,72 +112,53 @@ fun Application.module(
         )
     }
 
-    /*
-     * Game state
-     */
     val sessionManager =
         GameSessionManager(
             songs
         )
 
-    /*
-     * Persistent repositories
-     */
     val playlistRepository =
         PlaylistRepository(
-            databaseUrl = databaseUrl
+            databaseUrl =
+                databaseUrl
         )
 
     val spotifyTokenRepository =
         SpotifyTokenRepository(
-            databaseUrl = databaseUrl
+            databaseUrl =
+                databaseUrl
         )
 
-    /*
-     * Currently still in-memory.
-     */
     val scoreRepository =
         ScoreRepository(
-            databaseUrl = databaseUrl
+            databaseUrl =
+                databaseUrl
         )
 
-    /*
-     * Spotify HTTP client.
-     *
-     * Only configured with Spotify credentials
-     * when Spotify configuration is available.
-     */
     val spotifyClient: HttpClient? =
         spotifyConfig?.let {
+
             HttpClient(CIO) {
+
                 install(
                     ClientContentNegotiation
                 ) {
                     json(
                         Json {
-                            ignoreUnknownKeys = true
+                            ignoreUnknownKeys =
+                                true
                         }
                     )
                 }
             }
         }
 
-    /*
-     * Spotify OAuth helper.
-     */
-    val spotifyAuth: SpotifyAuth? =
+    val spotifyAuth =
         spotifyConfig?.let {
-            SpotifyAuth(
-                it
-            )
+            SpotifyAuth(it)
         }
 
-    /*
-     * Handles authorization-code exchange
-     * and refresh-token requests.
-     */
-    val spotifyTokenService:
-            SpotifyTokenService? =
+    val spotifyTokenService =
         if (
             spotifyConfig != null &&
             spotifyClient != null
@@ -162,50 +171,36 @@ fun Application.module(
             null
         }
 
-    /*
-     * Manages Spotify access tokens.
-     *
-     * Refresh tokens are persisted through
-     * SpotifyTokenRepository.
-     */
-    val spotifyTokenManager:
-            SpotifyTokenManager? =
+    val spotifyTokenManager =
         spotifyTokenService?.let {
+
             SpotifyTokenManager(
-                tokenService = it,
+                tokenService =
+                    it,
                 tokenRepository =
                     spotifyTokenRepository
             )
         }
 
-    /*
-     * Spotify API implementation.
-     *
-     * Tests may replace this with
-     * FakeSpotifyService.
-     */
-    val spotifyService: SpotifyService =
-        spotifyServiceOverride
-            ?: RealSpotifyService(
-                client =
-                    spotifyClient
-                        ?: HttpClient(CIO) {
-                            install(
-                                ClientContentNegotiation
-                            ) {
-                                json(
-                                    Json {
-                                        ignoreUnknownKeys =
-                                            true
-                                    }
-                                )
-                            }
-                        },
-                accessToken = {
-                    spotifyTokenManager
-                        ?.getAccessToken()
-                }
-            )
+    val spotifyServiceForSession:
+                (String) -> SpotifyService =
+        { sessionId ->
+
+            spotifyServiceOverride
+                ?: RealSpotifyService(
+                    client =
+                        spotifyClient
+                            ?: error(
+                                "Spotify client not configured"
+                            ),
+                    accessToken = {
+                        spotifyTokenManager
+                            ?.getAccessToken(
+                                sessionId
+                            )
+                    }
+                )
+        }
 
     routing {
 
@@ -215,11 +210,24 @@ fun Application.module(
             )
         }
 
+        get("/session") {
+
+            val session =
+                call.getOrCreateUserSession()
+
+            call.respond(
+                mapOf(
+                    "sessionId" to
+                            session.id
+                )
+            )
+        }
+
         gameRoutes(
             sessionManager =
                 sessionManager,
-            spotifyService =
-                spotifyService,
+            spotifyServiceForSession =
+                spotifyServiceForSession,
             playlistRepository =
                 playlistRepository
         )
@@ -227,8 +235,8 @@ fun Application.module(
         playlistRoutes(
             playlistRepository =
                 playlistRepository,
-            spotifyService =
-                spotifyService
+            spotifyServiceForSession =
+                spotifyServiceForSession
         )
 
         scoreRoutes(
@@ -241,12 +249,10 @@ fun Application.module(
         spotifyRoutes(
             spotifyAuth =
                 spotifyAuth,
-            spotifyTokenService =
-                spotifyTokenService,
             spotifyTokenManager =
                 spotifyTokenManager,
-            spotifyService =
-                spotifyService
+            spotifyServiceForSession =
+                spotifyServiceForSession
         )
     }
 

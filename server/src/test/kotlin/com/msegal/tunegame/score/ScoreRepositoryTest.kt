@@ -59,4 +59,42 @@ class ScoreRepositoryTest {
             repository.create("Marc", -1)
         }
     }
+
+    @Test
+    fun `concurrent score writes are safe`() {
+
+        val repository =
+            ScoreRepository(
+                databaseUrl =
+                    "jdbc:sqlite::memory:"
+            )
+
+        val executor =
+            java.util.concurrent.Executors
+                .newFixedThreadPool(8)
+
+        val futures =
+            (1..50).map { number ->
+
+                executor.submit {
+                    repository.create(
+                        playerName =
+                            "Player $number",
+                        score =
+                            number
+                    )
+                }
+            }
+
+        futures.forEach {
+            it.get()
+        }
+
+        executor.shutdown()
+
+        assertEquals(
+            50,
+            repository.getAll().size
+        )
+    }
 }

@@ -1,126 +1,120 @@
 package com.msegal.tunegame.spotify
 
+import java.util.concurrent.ConcurrentHashMap
+
 class SpotifyTokenManager(
     private val tokenService: SpotifyTokenProvider,
-    private val tokenRepository: SpotifyTokenRepository? = null,
-    private val clock: () -> Long = System::currentTimeMillis
+    private val tokenRepository: SpotifyTokenRepository,
+    private val clock: () -> Long =
+        System::currentTimeMillis
 ) {
 
-    private var token: SpotifyToken? = null
-    private var expiresAt: Long = 0L
+    private data class CachedToken(
+        val accessToken: String,
+        val expiresAt: Long
+    )
 
-    init {
-        restoreSavedRefreshToken()
-    }
+    private val accessTokens =
+        ConcurrentHashMap<String, CachedToken>()
 
-    private fun restoreSavedRefreshToken() {
+    suspend fun getAccessToken(
+        sessionId: String
+    ): String? {
 
-        val refreshToken =
-            tokenRepository
-                ?.getRefreshToken()
-                ?: return
-
-        /*
-         * We don't persist access tokens because they expire quickly.
-         *
-         * This deliberately creates an already-expired token.
-         * The first call to getAccessToken() will therefore use
-         * the persisted refresh token to request a fresh access token.
-         */
-        token =
-            SpotifyToken(
-                accessToken = "",
-                tokenType = "Bearer",
-                expiresIn = 0,
-                refreshToken = refreshToken
-            )
-
-        expiresAt = 0L
-    }
-
-    fun setToken(
-        newToken: SpotifyToken
-    ) {
-
-        val previousRefreshToken =
-            token?.refreshToken
-                ?: tokenRepository
-                    ?.getRefreshToken()
-
-        val updatedToken =
-            if (
-                newToken.refreshToken == null &&
-                previousRefreshToken != null
-            ) {
-                newToken.copy(
-                    refreshToken =
-                        previousRefreshToken
-                )
-            } else {
-                newToken
-            }
-
-        token =
-            updatedToken
-
-        expiresAt =
-            clock() +
-                    (
-                            updatedToken.expiresIn *
-                                    1000L
-                            )
-
-        updatedToken.refreshToken?.let {
-                refreshToken ->
-
-            tokenRepository
-                ?.saveRefreshToken(
-                    refreshToken
-                )
-        }
-    }
-
-    suspend fun getAccessToken(): String? {
-
-        val currentToken =
-            token ?: return null
-
-        val refreshEarlyMs =
-            60_000L
+        val cached =
+            accessTokens[sessionId]
 
         if (
-            currentToken.accessToken.isNotBlank() &&
-            clock() <
-            expiresAt - refreshEarlyMs
+            cached != null &&
+            clock() < cached.expiresAt
         ) {
-            return currentToken.accessToken
+            return cached.accessToken
         }
 
         val refreshToken =
-            currentToken.refreshToken
+            tokenRepository.getRefreshToken(
+                sessionId
+            )
                 ?: return null
 
-        val refreshedToken =
+        val token =
             tokenService.refreshToken(
                 refreshToken
             )
 
-        val updatedToken =
-            if (
-                refreshedToken.refreshToken == null
-            ) {
-                refreshedToken.copy(
-                    refreshToken =
-                        refreshToken
-                )
-            } else {
-                refreshedToken
-            }
-
-        setToken(
-            updatedToken
+        storeToken(
+            sessionId = sessionId,
+            token = token
         )
 
-        return updatedToken.accessToken
+        return token.accessToken
+    }
+
+    suspend fun exchangeCode(
+        sessionId: String,
+        code: String
+    ) {
+
+        val token =
+            tokenService.exchangeCode(
+                code
+            )
+
+        storeToken(
+            sessionId = sessionId,
+            token = token
+        )
+    }
+
+    fun setToken(
+        sessionId: String,
+        token: SpotifyToken
+    ) {
+        storeToken(
+            sessionId = sessionId,
+            token = token
+        )
+    }
+
+    fun logout(
+        sessionId: String
+    ) {
+
+        accessTokens.remove(
+            sessionId
+        )
+
+        tokenRepository.deleteRefreshToken(
+            sessionId
+        )
+    }
+
+    private fun storeToken(
+        sessionId: String,
+        token: SpotifyToken
+    ) {
+
+        val expiresAt =
+            clock() +
+                    token.expiresIn * 1000L -
+                    30_000L
+
+        accessTokens[sessionId] =
+            CachedToken(
+                accessToken =
+                    token.accessToken,
+                expiresAt =
+                    expiresAt
+            )
+
+        val refreshToken =
+            token.refreshToken
+
+        if (refreshToken != null) {
+            tokenRepository.saveRefreshToken(
+                sessionId = sessionId,
+                refreshToken = refreshToken
+            )
+        }
     }
 }

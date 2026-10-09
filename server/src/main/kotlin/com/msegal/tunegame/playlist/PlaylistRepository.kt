@@ -3,6 +3,7 @@ package com.msegal.tunegame.playlist
 import java.sql.Connection
 import java.sql.DriverManager
 import java.util.UUID
+import kotlin.jvm.Synchronized
 
 class PlaylistRepository(
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
@@ -16,6 +17,12 @@ class PlaylistRepository(
         DriverManager.getConnection(databaseUrl)
 
     init {
+        connection.createStatement().use {
+            it.execute(
+                "PRAGMA busy_timeout = 5000"
+            )
+        }
+
         createTable()
     }
 
@@ -33,7 +40,9 @@ class PlaylistRepository(
         }
     }
 
+    @Synchronized
     fun getAll(): List<Playlist> {
+
         val playlists =
             mutableListOf<Playlist>()
 
@@ -48,6 +57,7 @@ class PlaylistRepository(
             statement.executeQuery().use { results ->
 
                 while (results.next()) {
+
                     playlists +=
                         Playlist(
                             id =
@@ -66,6 +76,7 @@ class PlaylistRepository(
         return playlists
     }
 
+    @Synchronized
     fun get(
         id: String
     ): Playlist? {
@@ -103,6 +114,7 @@ class PlaylistRepository(
         }
     }
 
+    @Synchronized
     fun findBySpotifyPlaylistId(
         spotifyPlaylistId: String
     ): Playlist? {
@@ -140,6 +152,7 @@ class PlaylistRepository(
         }
     }
 
+    @Synchronized
     fun create(
         name: String,
         spotifyPlaylistId: String
@@ -206,6 +219,7 @@ class PlaylistRepository(
         return playlist
     }
 
+    @Synchronized
     fun delete(
         id: String
     ): Boolean {

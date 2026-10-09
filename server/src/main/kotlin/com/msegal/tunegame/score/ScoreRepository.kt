@@ -3,6 +3,7 @@ package com.msegal.tunegame.score
 import java.sql.Connection
 import java.sql.DriverManager
 import java.util.UUID
+import kotlin.jvm.Synchronized
 
 class ScoreRepository(
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
@@ -12,6 +13,12 @@ class ScoreRepository(
         DriverManager.getConnection(databaseUrl)
 
     init {
+        connection.createStatement().use {
+            it.execute(
+                "PRAGMA busy_timeout = 5000"
+            )
+        }
+
         createTable()
     }
 
@@ -29,6 +36,7 @@ class ScoreRepository(
         }
     }
 
+    @Synchronized
     fun getAll(): List<Score> {
 
         val scores =
@@ -45,27 +53,28 @@ class ScoreRepository(
             """.trimIndent()
         ).use { statement ->
 
-            val result =
-                statement.executeQuery()
+            statement.executeQuery().use { result ->
 
-            while (result.next()) {
+                while (result.next()) {
 
-                scores += Score(
-                    id =
-                        result.getString("id"),
-                    playerName =
-                        result.getString(
-                            "player_name"
-                        ),
-                    score =
-                        result.getInt("score")
-                )
+                    scores += Score(
+                        id =
+                            result.getString("id"),
+                        playerName =
+                            result.getString(
+                                "player_name"
+                            ),
+                        score =
+                            result.getInt("score")
+                    )
+                }
             }
         }
 
         return scores
     }
 
+    @Synchronized
     fun create(
         playerName: String,
         score: Int

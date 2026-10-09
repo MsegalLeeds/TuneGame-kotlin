@@ -20,6 +20,7 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:3.3.0")
     implementation("io.ktor:ktor-client-content-negotiation:3.3.0")
     implementation("io.ktor:ktor-server-cors:3.3.0")
+    implementation("io.ktor:ktor-server-sessions:3.3.0")
 
     // Tests
     testImplementation(kotlin("test"))

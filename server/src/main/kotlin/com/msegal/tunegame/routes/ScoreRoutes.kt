@@ -3,11 +3,14 @@ package com.msegal.tunegame.routes
 import com.msegal.tunegame.api.CreateScoreRequest
 import com.msegal.tunegame.api.ErrorResponse
 import com.msegal.tunegame.game.GameSessionManager
+import com.msegal.tunegame.score.Score
 import com.msegal.tunegame.score.ScoreRepository
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 
 fun Route.scoreRoutes(
     scoreRepository: ScoreRepository,
@@ -27,7 +30,9 @@ fun Route.scoreRoutes(
         if (request.playerName.isBlank()) {
             call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorResponse("playerName is required")
+                ErrorResponse(
+                    "playerName is required"
+                )
             )
             return@post
         }
@@ -35,47 +40,80 @@ fun Route.scoreRoutes(
         if (request.gameId.isBlank()) {
             call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorResponse("gameId is required")
-            )
-            return@post
-        }
-
-        val session =
-            sessionManager.getGame(request.gameId)
-
-        if (session == null) {
-            call.respond(
-                HttpStatusCode.NotFound,
-                ErrorResponse("Game not found")
-            )
-            return@post
-        }
-
-        if (!session.engine.state.gameOver) {
-            call.respond(
-                HttpStatusCode.Conflict,
-                ErrorResponse("Game is not over")
-            )
-            return@post
-        }
-
-        if (session.scoreSubmitted) {
-            call.respond(
-                HttpStatusCode.Conflict,
                 ErrorResponse(
-                    "Score has already been submitted"
+                    "gameId is required"
                 )
             )
             return@post
         }
 
-        val score =
-            scoreRepository.create(
-                playerName = request.playerName,
-                score = session.engine.state.score
+        val session =
+            sessionManager.getGame(
+                request.gameId
             )
 
-        session.markScoreSubmitted()
+        if (session == null) {
+            call.respond(
+                HttpStatusCode.NotFound,
+                ErrorResponse(
+                    "Game not found"
+                )
+            )
+            return@post
+        }
+
+        val outcome =
+            synchronized(session) {
+
+                when {
+                    session.scoreSubmitted -> {
+                        ScoreSubmissionOutcome(
+                            error =
+                                "Score has already been submitted"
+                        )
+                    }
+
+                    !session.engine.state.gameOver -> {
+                        ScoreSubmissionOutcome(
+                            error =
+                                "Game is not over"
+                        )
+                    }
+
+                    else -> {
+                        val score =
+                            scoreRepository.create(
+                                playerName =
+                                    request.playerName,
+                                score =
+                                    session.engine.state.score
+                            )
+
+                        session.markScoreSubmitted()
+
+                        ScoreSubmissionOutcome(
+                            score = score
+                        )
+                    }
+                }
+            }
+
+        if (outcome.error != null) {
+            call.respond(
+                HttpStatusCode.Conflict,
+                ErrorResponse(
+                    outcome.error
+                )
+            )
+
+            return@post
+        }
+
+        val score =
+            outcome.score
+                ?: error(
+                    "Score submission completed without a score"
+                )
 
         call.respond(
             HttpStatusCode.Created,
@@ -83,3 +121,8 @@ fun Route.scoreRoutes(
         )
     }
 }
+
+private data class ScoreSubmissionOutcome(
+    val score: Score? = null,
+    val error: String? = null
+)

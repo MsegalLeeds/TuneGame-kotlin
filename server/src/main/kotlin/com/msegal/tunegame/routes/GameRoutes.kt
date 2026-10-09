@@ -1,18 +1,29 @@
 package com.msegal.tunegame.routes
 
 import com.msegal.tunegame.TIME_LIMIT_SECONDS
-import com.msegal.tunegame.api.*
-import com.msegal.tunegame.game.*
-import com.msegal.tunegame.spotify.SpotifyService
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import com.msegal.tunegame.api.AnswerRequest
+import com.msegal.tunegame.api.ErrorResponse
+import com.msegal.tunegame.api.NewGameRequest
+import com.msegal.tunegame.api.NewGameResponse
+import com.msegal.tunegame.api.PublicQuestion
+import com.msegal.tunegame.api.QuestionResponse
+import com.msegal.tunegame.game.GameSessionManager
+import com.msegal.tunegame.game.QuestionType
 import com.msegal.tunegame.playlist.PlaylistRepository
+import com.msegal.tunegame.session.getOrCreateUserSession
+import com.msegal.tunegame.spotify.SpotifyService
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.receive
+import io.ktor.server.request.receiveNullable
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 
 fun Route.gameRoutes(
     sessionManager: GameSessionManager,
-    spotifyService: SpotifyService,
+    spotifyServiceForSession:
+        (String) -> SpotifyService,
     playlistRepository: PlaylistRepository
 ) {
 
@@ -20,7 +31,9 @@ fun Route.gameRoutes(
 
         val request =
             try {
-                call.receiveNullable<NewGameRequest>()
+                call.receiveNullable<
+                        NewGameRequest
+                        >()
             } catch (e: Exception) {
                 null
             }
@@ -31,28 +44,45 @@ fun Route.gameRoutes(
         val gameId =
             if (playlistId == null) {
 
-                // Normal built-in song list
                 sessionManager.createGame()
 
             } else {
 
                 val playlist =
-                    playlistRepository.get(playlistId)
+                    playlistRepository.get(
+                        playlistId
+                    )
 
                 if (playlist == null) {
                     call.respond(
                         HttpStatusCode.NotFound,
-                        ErrorResponse("Playlist not found")
+                        ErrorResponse(
+                            "Playlist not found"
+                        )
                     )
+
                     return@post
                 }
 
+                val userSession =
+                    call.getOrCreateUserSession()
+
+                val spotifyService =
+                    spotifyServiceForSession(
+                        userSession.id
+                    )
+
                 val songs =
                     try {
-                        spotifyService.getPlaylistSongs(
-                            playlist.spotifyPlaylistId
-                        )
+
+                        spotifyService
+                            .getPlaylistSongs(
+                                playlist
+                                    .spotifyPlaylistId
+                            )
+
                     } catch (e: Exception) {
+
                         call.respond(
                             HttpStatusCode.ServiceUnavailable,
                             ErrorResponse(
@@ -60,6 +90,7 @@ fun Route.gameRoutes(
                                     ?: "Unable to load Spotify playlist"
                             )
                         )
+
                         return@post
                     }
 
@@ -70,85 +101,154 @@ fun Route.gameRoutes(
                             "Playlist needs at least 4 songs"
                         )
                     )
+
                     return@post
                 }
 
-                sessionManager.createGame(songs)
+                sessionManager.createGame(
+                    songs
+                )
             }
 
         val session =
-            sessionManager.getGame(gameId)
-                ?: error("Created game could not be found")
+            sessionManager.getGame(
+                gameId
+            )
+                ?: error(
+                    "Created game could not be found"
+                )
 
         call.respond(
             NewGameResponse(
                 ok = true,
-                message = "Game created",
-                gameId = gameId,
-                lives = session.engine.state.lives
+                message =
+                    "Game created",
+                gameId =
+                    gameId,
+                lives =
+                    session.engine
+                        .state
+                        .lives
             )
         )
     }
 
     get("/question") {
+
         val gameId =
-            call.request.queryParameters["gameId"]
+            call.request
+                .queryParameters[
+                "gameId"
+            ]
 
         if (gameId == null) {
             call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorResponse("gameId is required")
+                ErrorResponse(
+                    "gameId is required"
+                )
             )
+
             return@get
         }
 
         val session =
-            sessionManager.getGame(gameId)
+            sessionManager.getGame(
+                gameId
+            )
 
         if (session == null) {
             call.respond(
                 HttpStatusCode.NotFound,
-                ErrorResponse("Game not found")
+                ErrorResponse(
+                    "Game not found"
+                )
             )
+
             return@get
         }
 
-        if (session.engine.state.gameOver) {
+        if (
+            session.engine
+                .state
+                .gameOver
+        ) {
             call.respond(
                 HttpStatusCode.BadRequest,
-                ErrorResponse("Game is over")
+                ErrorResponse(
+                    "Game is over"
+                )
             )
+
+            return@get
+        }
+
+        if (
+            session.currentQuestion !=
+            null
+        ) {
+            call.respond(
+                HttpStatusCode.Conflict,
+                ErrorResponse(
+                    "A question is already active"
+                )
+            )
+
             return@get
         }
 
         val generated =
-            session.engine.generateQuestionWithSong(
-                QuestionType.entries.random()
-            )
+            session.engine
+                .generateQuestionWithSong(
+                    QuestionType
+                        .entries
+                        .random()
+                )
 
         session.startQuestion(
-            question = generated.question,
-            song = generated.song
+            question =
+                generated.question,
+            song =
+                generated.song
         )
 
-        var albumArtUrl: String? = null
+        val userSession =
+            call.getOrCreateUserSession()
+
+        val spotifyService =
+            spotifyServiceForSession(
+                userSession.id
+            )
+
+        var albumArtUrl:
+                String? =
+            null
 
         try {
+
             val track =
                 spotifyService.searchTrack(
-                    song = generated.song.song,
-                    artist = generated.song.artist
+                    song =
+                        generated.song.song,
+                    artist =
+                        generated.song.artist
                 )
 
             if (track != null) {
-                albumArtUrl = track.albumArtUrl
+
+                albumArtUrl =
+                    track.albumArtUrl
 
                 spotifyService.playTrack(
-                    trackUri = track.uri,
-                    positionMs = 30_000
+                    trackUri =
+                        track.uri,
+                    positionMs =
+                        30_000
                 )
             }
+
         } catch (e: Exception) {
+
             println(
                 "Spotify playback failed: ${e.message}"
             )
@@ -156,85 +256,120 @@ fun Route.gameRoutes(
 
         val publicQuestion =
             PublicQuestion(
-                question = generated.question.question,
-                choices = generated.question.choices,
-                type = generated.question.type,
-                albumArtUrl = albumArtUrl
+                question =
+                    generated
+                        .question
+                        .question,
+                choices =
+                    generated
+                        .question
+                        .choices,
+                type =
+                    generated
+                        .question
+                        .type,
+                albumArtUrl =
+                    albumArtUrl
             )
 
         call.respond(
-            QuestionResponse(publicQuestion)
+            QuestionResponse(
+                publicQuestion
+            )
         )
     }
 
     post("/answer") {
+
         val request =
-            call.receive<AnswerRequest>()
+            call.receive<
+                    AnswerRequest
+                    >()
 
         val session =
-            sessionManager.getGame(request.gameId)
+            sessionManager.getGame(
+                request.gameId
+            )
 
         if (session == null) {
             call.respond(
                 HttpStatusCode.NotFound,
-                ErrorResponse("Game not found")
-            )
-            return@post
-        }
-
-        val question =
-            session.currentQuestion
-
-        if (question == null) {
-            call.respond(
-                HttpStatusCode.BadRequest,
-                ErrorResponse("No active question")
-            )
-            return@post
-        }
-
-        val elapsedSeconds =
-            session.elapsedSeconds()
-
-        if (elapsedSeconds > TIME_LIMIT_SECONDS) {
-            val result =
-                session.engine.checkAnswer(
-                    answer = "",
-                    question = question,
-                    elapsedSeconds = elapsedSeconds
+                ErrorResponse(
+                    "Game not found"
                 )
+            )
 
-            try {
-                spotifyService.pause()
-            } catch (e: Exception) {
-                println(
-                    "Spotify pause failed: ${e.message}"
-                )
-            }
-
-            session.clearQuestion()
-
-            call.respond(result)
             return@post
         }
 
         val result =
-            session.engine.checkAnswer(
-                answer = request.answer,
-                question = question,
-                elapsedSeconds = elapsedSeconds
+            synchronized(session) {
+
+                val question =
+                    session.currentQuestion
+                        ?: return@synchronized null
+
+                val elapsedSeconds =
+                    session.elapsedSeconds()
+
+                val answer =
+                    if (
+                        elapsedSeconds >
+                        TIME_LIMIT_SECONDS
+                    ) {
+                        ""
+                    } else {
+                        request.answer
+                    }
+
+                val answerResult =
+                    session.engine
+                        .checkAnswer(
+                            answer =
+                                answer,
+                            question =
+                                question,
+                            elapsedSeconds =
+                                elapsedSeconds
+                        )
+
+                session.clearQuestion()
+
+                answerResult
+            }
+
+        if (result == null) {
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ErrorResponse(
+                    "No active question"
+                )
+            )
+
+            return@post
+        }
+
+        val userSession =
+            call.getOrCreateUserSession()
+
+        val spotifyService =
+            spotifyServiceForSession(
+                userSession.id
             )
 
         try {
+
             spotifyService.pause()
+
         } catch (e: Exception) {
+
             println(
                 "Spotify pause failed: ${e.message}"
             )
         }
 
-        session.clearQuestion()
-
-        call.respond(result)
+        call.respond(
+            result
+        )
     }
 }

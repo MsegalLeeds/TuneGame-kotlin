@@ -710,4 +710,112 @@ class ApplicationTest {
                 )
             )
         }
+
+    @Test
+    fun `cannot request another question while one is active`() =
+        testApplication {
+
+            application {
+                module(
+                    songs = testSongs,
+                    spotifyServiceOverride =
+                        FakeSpotifyService(),
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+            }
+
+            val newGameResponse =
+                client.post("/new-game")
+
+            val gameId =
+                Regex(
+                    "\"gameId\":\"([^\"]+)\""
+                )
+                    .find(
+                        newGameResponse.bodyAsText()
+                    )
+                    ?.groupValues
+                    ?.get(1)
+
+            assertTrue(gameId != null)
+
+            val firstQuestion =
+                client.get(
+                    "/question?gameId=$gameId"
+                )
+
+            assertEquals(
+                HttpStatusCode.OK,
+                firstQuestion.status
+            )
+
+            val secondQuestion =
+                client.get(
+                    "/question?gameId=$gameId"
+                )
+
+            assertEquals(
+                HttpStatusCode.Conflict,
+                secondQuestion.status
+            )
+
+            assertTrue(
+                secondQuestion
+                    .bodyAsText()
+                    .contains(
+                        "A question is already active"
+                    )
+            )
+        }
+
+    @Test
+    fun `spotify play uses POST`() =
+        testApplication {
+
+            application {
+                module(
+                    songs = testSongs,
+                    spotifyServiceOverride =
+                        FakeSpotifyService(),
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+            }
+
+            val response =
+                client.post(
+                    "/spotify/play?song=Test%20Song&artist=Test%20Artist"
+                )
+
+            assertEquals(
+                HttpStatusCode.OK,
+                response.status
+            )
+        }
+
+    @Test
+    fun `spotify pause uses POST`() =
+        testApplication {
+
+            application {
+                module(
+                    songs = testSongs,
+                    spotifyServiceOverride =
+                        FakeSpotifyService(),
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+            }
+
+            val response =
+                client.post(
+                    "/spotify/pause"
+                )
+
+            assertEquals(
+                HttpStatusCode.OK,
+                response.status
+            )
+        }
 }
