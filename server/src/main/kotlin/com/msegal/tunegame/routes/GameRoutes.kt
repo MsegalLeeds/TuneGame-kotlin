@@ -24,6 +24,8 @@ fun Route.gameRoutes(
     sessionManager: GameSessionManager,
     spotifyServiceForSession:
         (String) -> SpotifyService,
+    spotifyConnectedForSession:
+    suspend (String) -> Boolean,
     playlistRepository: PlaylistRepository
 ) {
 
@@ -66,6 +68,22 @@ fun Route.gameRoutes(
 
                 val userSession =
                     call.getOrCreateUserSession()
+
+                val connected =
+                    spotifyConnectedForSession(
+                        userSession.id
+                    )
+
+                if (!connected) {
+                    call.respond(
+                        HttpStatusCode.Unauthorized,
+                        ErrorResponse(
+                            "Spotify account is not connected"
+                        )
+                    )
+
+                    return@post
+                }
 
                 val spotifyService =
                     spotifyServiceForSession(

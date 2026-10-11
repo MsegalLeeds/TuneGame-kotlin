@@ -64,7 +64,8 @@ fun Application.module(
     songs: List<Song>,
     spotifyConfig: SpotifyConfig? = null,
     spotifyServiceOverride: SpotifyService? = null,
-    databaseUrl: String = "jdbc:sqlite:tunegame.db"
+    databaseUrl: String = "jdbc:sqlite:tunegame.db",
+    playlistRepositoryOverride: PlaylistRepository? = null
 ) {
 
     install(ServerContentNegotiation) {
@@ -120,7 +121,8 @@ fun Application.module(
         )
 
     val playlistRepository =
-        PlaylistRepository(
+        playlistRepositoryOverride
+            ?: PlaylistRepository(
             databaseUrl =
                 databaseUrl
         )
@@ -244,6 +246,8 @@ fun Application.module(
                 sessionManager,
             spotifyServiceForSession =
                 spotifyServiceForSession,
+            spotifyConnectedForSession =
+                spotifyConnectedForSession,
             playlistRepository =
                 playlistRepository
         )

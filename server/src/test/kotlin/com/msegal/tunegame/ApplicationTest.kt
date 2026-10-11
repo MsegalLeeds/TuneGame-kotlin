@@ -7,6 +7,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlin.test.*
+import com.msegal.tunegame.playlist.PlaylistRepository
 
 class ApplicationTest {
 
@@ -922,6 +923,64 @@ class ApplicationTest {
                     {
                         "name": "Test",
                         "spotifyPlaylistId": "spotify123"
+                    }
+                    """.trimIndent()
+                    )
+                }
+
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                response.status
+            )
+
+            assertTrue(
+                response.bodyAsText()
+                    .contains(
+                        "Spotify account is not connected"
+                    )
+            )
+        }
+
+    @Test
+    fun `starting saved playlist game requires Spotify connection`() =
+        testApplication {
+
+            val playlistRepository =
+                PlaylistRepository(
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+
+            val playlist =
+                playlistRepository.create(
+                    name =
+                        "Classic Rock",
+                    spotifyPlaylistId =
+                        "spotify123"
+                )
+
+            application {
+                module(
+                    songs =
+                        testSongs,
+                    databaseUrl =
+                        "jdbc:sqlite::memory:",
+                    playlistRepositoryOverride =
+                        playlistRepository
+                )
+            }
+
+            val response =
+                client.post("/new-game") {
+
+                    contentType(
+                        ContentType.Application.Json
+                    )
+
+                    setBody(
+                        """
+                    {
+                        "playlistId": "${playlist.id}"
                     }
                     """.trimIndent()
                     )
