@@ -15,6 +15,8 @@ class GameClientTest {
         var submittedPlayerName: String? = null
         var submittedGameId: String? = null
 
+        var requestedPositionMs: Int? = null
+
         override suspend fun getSpotifyStatus(): SpotifyStatusResponse {
             return SpotifyStatusResponse(
                 connected = true
@@ -27,7 +29,9 @@ class GameClientTest {
             )
         }
 
-        override suspend fun newGame(playlistId: String?): NewGameResponse {
+        override suspend fun newGame(
+            playlistId: String?
+        ): NewGameResponse {
             return NewGameResponse(
                 ok = true,
                 message = "Game created",
@@ -37,8 +41,13 @@ class GameClientTest {
         }
 
         override suspend fun getQuestion(
-            gameId: String
+            gameId: String,
+            positionMs: Int
         ): QuestionResponse {
+
+            requestedPositionMs =
+                positionMs
+
             return QuestionResponse(
                 question = PublicQuestion(
                     question = "Who wrote Come Together?",
@@ -92,8 +101,12 @@ class GameClientTest {
             playerName: String,
             gameId: String
         ): Score {
-            submittedPlayerName = playerName
-            submittedGameId = gameId
+
+            submittedPlayerName =
+                playerName
+
+            submittedGameId =
+                gameId
 
             return Score(
                 id = "score-1",
@@ -104,219 +117,379 @@ class GameClientTest {
     }
 
     @Test
-    fun `new game resets state`() = runTest {
-        val api = FakeTuneGameApi()
-        val client = GameClient(api)
+    fun `new game resets state`() =
+        runTest {
 
-        val state = client.newGame()
+            val api =
+                FakeTuneGameApi()
 
-        assertEquals("game-123", state.gameId)
-        assertEquals(3, state.lives)
-        assertEquals(0, state.score)
-        assertEquals(0, state.streak)
-        assertFalse(state.gameOver)
-        assertNull(state.question)
-    }
+            val client =
+                GameClient(api)
 
-    @Test
-    fun `next question updates current question`() = runTest {
-        val api = FakeTuneGameApi()
-        val client = GameClient(api)
+            val state =
+                client.newGame()
 
-        client.newGame()
-        val state = client.nextQuestion()
+            assertEquals(
+                "game-123",
+                state.gameId
+            )
 
-        assertEquals(
-            "Who wrote Come Together?",
-            state.question?.question
-        )
+            assertEquals(
+                3,
+                state.lives
+            )
 
-        assertEquals(
-            QuestionType.SONG_TO_ARTIST,
-            state.question?.type
-        )
-    }
+            assertEquals(
+                0,
+                state.score
+            )
 
-    @Test
-    fun `answer updates score streak and lives`() = runTest {
-        val api = FakeTuneGameApi()
-        val client = GameClient(api)
+            assertEquals(
+                0,
+                state.streak
+            )
 
-        client.newGame()
-        client.nextQuestion()
+            assertFalse(
+                state.gameOver
+            )
 
-        val state =
-            client.answer("The Beatles")
-
-        assertEquals(10, state.score)
-        assertEquals(1, state.streak)
-        assertEquals(3, state.lives)
-        assertFalse(state.gameOver)
-
-        // Once answered, no question should remain active.
-        assertNull(state.question)
-    }
-
-    @Test
-    fun `submit score sends player name and game id`() = runTest {
-        val api = FakeTuneGameApi()
-        val client = GameClient(api)
-
-        client.newGame()
-
-        // For this test, make the game appear finished by
-        // returning a game-over result from a dedicated fake.
-        val finishedApi = object : TuneGameApi by api {
-            override suspend fun submitAnswer(
-                gameId: String,
-                answer: String
-            ): AnswerResult {
-                return AnswerResult(
-                    correct = false,
-                    correctAnswer = "The Beatles",
-                    pointsAwarded = 0,
-                    score = 10,
-                    streak = 0,
-                    lives = 0,
-                    gameOver = true
-                )
-            }
-
-            override suspend fun submitScore(
-                playerName: String,
-                gameId: String
-            ): Score {
-                api.submittedPlayerName = playerName
-                api.submittedGameId = gameId
-
-                return Score(
-                    id = "score-1",
-                    playerName = playerName,
-                    score = 10
-                )
-            }
+            assertNull(
+                state.question
+            )
         }
 
-        val finishedClient =
-            GameClient(finishedApi)
-
-        finishedClient.newGame()
-        finishedClient.nextQuestion()
-        finishedClient.answer("Wrong answer")
-
-        assertTrue(
-            finishedClient.state.value.gameOver
-        )
-
-        finishedClient.submitScore("Marc")
-
-        assertEquals(
-            "Marc",
-            api.submittedPlayerName
-        )
-
-        assertEquals(
-            "game-123",
-            api.submittedGameId
-        )
-    }
-
     @Test
-    fun `loading is false after new game completes`() = runTest {
-        val api = FakeTuneGameApi()
-        val client = GameClient(api)
+    fun `next question updates current question`() =
+        runTest {
 
-        client.newGame()
+            val api =
+                FakeTuneGameApi()
 
-        assertFalse(
-            client.state.value.isLoading
-        )
+            val client =
+                GameClient(api)
 
-        assertEquals(
-            null,
-            client.state.value.error
-        )
-    }
+            client.newGame()
 
-    @Test
-    fun `question failure updates error state`() = runTest {
-        val api = object : TuneGameApi by FakeTuneGameApi() {
+            val state =
+                client.nextQuestion()
 
-            override suspend fun getQuestion(
-                gameId: String
-            ): QuestionResponse {
-                error("Server unavailable")
-            }
+            assertEquals(
+                "Who wrote Come Together?",
+                state.question?.question
+            )
+
+            assertEquals(
+                QuestionType.SONG_TO_ARTIST,
+                state.question?.type
+            )
         }
 
-        val client = GameClient(api)
+    @Test
+    fun `answer updates score streak and lives`() =
+        runTest {
 
-        client.newGame()
-        client.nextQuestion()
+            val api =
+                FakeTuneGameApi()
 
-        assertFalse(
-            client.state.value.isLoading
-        )
+            val client =
+                GameClient(api)
 
-        assertEquals(
-            "Server unavailable",
-            client.state.value.error
-        )
-    }
+            client.newGame()
+            client.nextQuestion()
+
+            val state =
+                client.answer(
+                    "The Beatles"
+                )
+
+            assertEquals(
+                10,
+                state.score
+            )
+
+            assertEquals(
+                1,
+                state.streak
+            )
+
+            assertEquals(
+                3,
+                state.lives
+            )
+
+            assertFalse(
+                state.gameOver
+            )
+
+            assertNull(
+                state.question
+            )
+        }
 
     @Test
-    fun `successful request clears previous error`() = runTest {
+    fun `submit score sends player name and game id`() =
+        runTest {
 
-        var shouldFail = true
+            val api =
+                FakeTuneGameApi()
 
-        val api = object : TuneGameApi by FakeTuneGameApi() {
+            val finishedApi =
+                object : TuneGameApi by api {
 
-            override suspend fun getQuestion(
-                gameId: String
-            ): QuestionResponse {
+                    override suspend fun submitAnswer(
+                        gameId: String,
+                        answer: String
+                    ): AnswerResult {
 
-                if (shouldFail) {
-                    error("Temporary error")
+                        return AnswerResult(
+                            correct = false,
+                            correctAnswer = "The Beatles",
+                            pointsAwarded = 0,
+                            score = 10,
+                            streak = 0,
+                            lives = 0,
+                            gameOver = true
+                        )
+                    }
+
+                    override suspend fun submitScore(
+                        playerName: String,
+                        gameId: String
+                    ): Score {
+
+                        api.submittedPlayerName =
+                            playerName
+
+                        api.submittedGameId =
+                            gameId
+
+                        return Score(
+                            id = "score-1",
+                            playerName = playerName,
+                            score = 10
+                        )
+                    }
                 }
 
-                return QuestionResponse(
-                    PublicQuestion(
-                        question = "Who wrote Come Together?",
-                        choices = listOf(
-                            "The Beatles",
-                            "Queen",
-                            "Pink Floyd",
-                            "The Who"
-                        ),
-                        type = QuestionType.SONG_TO_ARTIST
-                    )
+            val finishedClient =
+                GameClient(
+                    finishedApi
                 )
-            }
+
+            finishedClient.newGame()
+            finishedClient.nextQuestion()
+            finishedClient.answer(
+                "Wrong answer"
+            )
+
+            assertTrue(
+                finishedClient
+                    .state
+                    .value
+                    .gameOver
+            )
+
+            finishedClient.submitScore(
+                "Marc"
+            )
+
+            assertEquals(
+                "Marc",
+                api.submittedPlayerName
+            )
+
+            assertEquals(
+                "game-123",
+                api.submittedGameId
+            )
         }
 
-        val client = GameClient(api)
+    @Test
+    fun `loading is false after new game completes`() =
+        runTest {
 
-        client.newGame()
+            val api =
+                FakeTuneGameApi()
 
-        client.nextQuestion()
+            val client =
+                GameClient(api)
 
-        assertEquals(
-            "Temporary error",
-            client.state.value.error
-        )
+            client.newGame()
 
-        shouldFail = false
+            assertFalse(
+                client
+                    .state
+                    .value
+                    .isLoading
+            )
 
-        client.nextQuestion()
+            assertEquals(
+                null,
+                client
+                    .state
+                    .value
+                    .error
+            )
+        }
 
-        assertEquals(
-            null,
-            client.state.value.error
-        )
+    @Test
+    fun `question failure updates error state`() =
+        runTest {
 
-        assertEquals(
-            "Who wrote Come Together?",
-            client.state.value.question?.question
-        )
-    }
+            val api =
+                object :
+                    TuneGameApi by FakeTuneGameApi() {
+
+                    override suspend fun getQuestion(
+                        gameId: String,
+                        positionMs: Int
+                    ): QuestionResponse {
+
+                        error(
+                            "Server unavailable"
+                        )
+                    }
+                }
+
+            val client =
+                GameClient(api)
+
+            client.newGame()
+            client.nextQuestion()
+
+            assertFalse(
+                client
+                    .state
+                    .value
+                    .isLoading
+            )
+
+            assertEquals(
+                "Server unavailable",
+                client
+                    .state
+                    .value
+                    .error
+            )
+        }
+
+    @Test
+    fun `successful request clears previous error`() =
+        runTest {
+
+            var shouldFail =
+                true
+
+            val api =
+                object :
+                    TuneGameApi by FakeTuneGameApi() {
+
+                    override suspend fun getQuestion(
+                        gameId: String,
+                        positionMs: Int
+                    ): QuestionResponse {
+
+                        if (shouldFail) {
+                            error(
+                                "Temporary error"
+                            )
+                        }
+
+                        return QuestionResponse(
+                            question = PublicQuestion(
+                                question =
+                                    "Who wrote Come Together?",
+                                choices =
+                                    listOf(
+                                        "The Beatles",
+                                        "Queen",
+                                        "Pink Floyd",
+                                        "The Who"
+                                    ),
+                                type =
+                                    QuestionType.SONG_TO_ARTIST
+                            )
+                        )
+                    }
+                }
+
+            val client =
+                GameClient(api)
+
+            client.newGame()
+
+            client.nextQuestion()
+
+            assertEquals(
+                "Temporary error",
+                client
+                    .state
+                    .value
+                    .error
+            )
+
+            shouldFail =
+                false
+
+            client.nextQuestion()
+
+            assertEquals(
+                null,
+                client
+                    .state
+                    .value
+                    .error
+            )
+
+            assertEquals(
+                "Who wrote Come Together?",
+                client
+                    .state
+                    .value
+                    .question
+                    ?.question
+            )
+        }
+
+    @Test
+    fun `next question defaults to clip playback`() =
+        runTest {
+
+            val api =
+                FakeTuneGameApi()
+
+            val client =
+                GameClient(api)
+
+            client.newGame()
+
+            client.nextQuestion()
+
+            assertEquals(
+                30_000,
+                api.requestedPositionMs
+            )
+        }
+
+    @Test
+    fun `next question supports full song playback`() =
+        runTest {
+
+            val api =
+                FakeTuneGameApi()
+
+            val client =
+                GameClient(api)
+
+            client.newGame()
+
+            client.nextQuestion(
+                positionMs = 0
+            )
+
+            assertEquals(
+                0,
+                api.requestedPositionMs
+            )
+        }
 }

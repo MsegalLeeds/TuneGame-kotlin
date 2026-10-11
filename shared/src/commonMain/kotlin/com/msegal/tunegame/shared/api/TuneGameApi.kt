@@ -7,7 +7,8 @@ interface TuneGameApi {
     ): NewGameResponse
 
     suspend fun getQuestion(
-        gameId: String
+        gameId: String,
+        positionMs: Int = 30_000
     ): QuestionResponse
 
     suspend fun submitAnswer(

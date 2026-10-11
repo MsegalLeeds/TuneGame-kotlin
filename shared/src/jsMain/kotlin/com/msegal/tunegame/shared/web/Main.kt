@@ -25,6 +25,7 @@ private var timeLeft = TIME_LIMIT_SECONDS
 private var selectedPlaylistId: String? = null
 private var answered = false
 private var typedMode = false
+private var fullSongMode = false
 
 private val api =
     createTuneGameApi(
@@ -85,7 +86,14 @@ private fun setupButtons() {
 
             showScreen("screen-game")
 
-            gameClient.nextQuestion()
+            gameClient.nextQuestion(
+                positionMs =
+                    if (fullSongMode) {
+                        0
+                    } else {
+                        30_000
+                    }
+            )
         }
 
         null
@@ -365,11 +373,19 @@ private fun setupButtons() {
 
     nextButton.onclick = {
         scope.launch {
+
             answered = false
 
             resetResult()
 
-            gameClient.nextQuestion()
+            gameClient.nextQuestion(
+                positionMs =
+                    if (fullSongMode) {
+                        0
+                    } else {
+                        30_000
+                    }
+            )
         }
 
         null
@@ -525,11 +541,30 @@ private fun setupButtons() {
 
     clipButton.onclick = {
 
+        fullSongMode = false
+
         clipButton
             .classList
             .add("active")
 
         fullButton
+            .classList
+            .remove("active")
+
+        setStartError("")
+
+        null
+    }
+
+    fullButton.onclick = {
+
+        fullSongMode = true
+
+        fullButton
+            .classList
+            .add("active")
+
+        clipButton
             .classList
             .remove("active")
 

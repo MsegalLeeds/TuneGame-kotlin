@@ -52,7 +52,8 @@ class KtorTuneGameApi(
     }
 
     override suspend fun getQuestion(
-        gameId: String
+        gameId: String,
+        positionMs: Int
     ): QuestionResponse {
 
         val response =
@@ -62,6 +63,11 @@ class KtorTuneGameApi(
                 parameter(
                     "gameId",
                     gameId
+                )
+
+                parameter(
+                    "positionMs",
+                    positionMs
                 )
             }
 

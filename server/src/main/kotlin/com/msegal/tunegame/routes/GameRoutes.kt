@@ -159,6 +159,15 @@ fun Route.gameRoutes(
                 "gameId"
             ]
 
+        val positionMs =
+            call.request
+                .queryParameters[
+                "positionMs"
+            ]
+                ?.toIntOrNull()
+                ?.coerceAtLeast(0)
+                ?: 30_000
+
         if (gameId == null) {
             call.respond(
                 HttpStatusCode.BadRequest,
@@ -261,7 +270,7 @@ fun Route.gameRoutes(
                     trackUri =
                         track.uri,
                     positionMs =
-                        30_000
+                        positionMs
                 )
             }
 
