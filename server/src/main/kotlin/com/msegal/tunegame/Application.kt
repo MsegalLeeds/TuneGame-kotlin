@@ -204,6 +204,20 @@ fun Application.module(
                 )
         }
 
+    val spotifyConnectedForSession:
+            suspend (String) -> Boolean =
+        { sessionId ->
+
+            if (spotifyServiceOverride != null) {
+                true
+            } else {
+                spotifyTokenManager
+                    ?.getAccessToken(
+                        sessionId
+                    ) != null
+            }
+        }
+
     routing {
 
         get("/") {
@@ -238,7 +252,9 @@ fun Application.module(
             playlistRepository =
                 playlistRepository,
             spotifyServiceForSession =
-                spotifyServiceForSession
+                spotifyServiceForSession,
+            spotifyConnectedForSession =
+                spotifyConnectedForSession
         )
 
         scoreRoutes(

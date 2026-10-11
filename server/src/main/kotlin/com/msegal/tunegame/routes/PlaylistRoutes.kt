@@ -16,7 +16,9 @@ import io.ktor.server.routing.post
 fun Route.playlistRoutes(
     playlistRepository: PlaylistRepository,
     spotifyServiceForSession:
-        (String) -> SpotifyService
+        (String) -> SpotifyService,
+    spotifyConnectedForSession:
+        suspend (String) -> Boolean
 ) {
 
     get("/playlist") {
@@ -48,6 +50,22 @@ fun Route.playlistRoutes(
 
         val userSession =
             call.getOrCreateUserSession()
+
+        val connected =
+            spotifyConnectedForSession(
+                userSession.id
+            )
+
+        if (!connected) {
+            call.respond(
+                HttpStatusCode.Unauthorized,
+                ErrorResponse(
+                    "Spotify account is not connected"
+                )
+            )
+
+            return@post
+        }
 
         val spotifyService =
             spotifyServiceForSession(

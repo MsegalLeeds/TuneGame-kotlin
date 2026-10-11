@@ -897,4 +897,46 @@ class ApplicationTest {
                 secondSessionId
             )
         }
+
+    @Test
+    fun `playlist creation requires Spotify connection`() =
+        testApplication {
+
+            application {
+                module(
+                    songs = testSongs,
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+            }
+
+            val response =
+                client.post("/playlist") {
+
+                    contentType(
+                        ContentType.Application.Json
+                    )
+
+                    setBody(
+                        """
+                    {
+                        "name": "Test",
+                        "spotifyPlaylistId": "spotify123"
+                    }
+                    """.trimIndent()
+                    )
+                }
+
+            assertEquals(
+                HttpStatusCode.Unauthorized,
+                response.status
+            )
+
+            assertTrue(
+                response.bodyAsText()
+                    .contains(
+                        "Spotify account is not connected"
+                    )
+            )
+        }
 }
