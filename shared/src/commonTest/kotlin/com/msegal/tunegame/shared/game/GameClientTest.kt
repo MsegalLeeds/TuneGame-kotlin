@@ -15,6 +15,18 @@ class GameClientTest {
         var submittedPlayerName: String? = null
         var submittedGameId: String? = null
 
+        override suspend fun getSpotifyStatus(): SpotifyStatusResponse {
+            return SpotifyStatusResponse(
+                connected = true
+            )
+        }
+
+        override suspend fun disconnectSpotify(): SpotifyStatusResponse {
+            return SpotifyStatusResponse(
+                connected = false
+            )
+        }
+
         override suspend fun newGame(playlistId: String?): NewGameResponse {
             return NewGameResponse(
                 ok = true,

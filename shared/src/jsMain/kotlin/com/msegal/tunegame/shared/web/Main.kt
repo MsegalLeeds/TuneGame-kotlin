@@ -24,10 +24,11 @@ private var timeLeft = TIME_LIMIT_SECONDS
 
 private var selectedPlaylistId: String? = null
 private var answered = false
+private var typedMode = false
 
 private val api =
     createTuneGameApi(
-        "http://localhost:8080"
+        "http://127.0.0.1:8080"
     )
 
 private val gameClient =
@@ -466,9 +467,6 @@ private fun setupButtons() {
 
     /*
      * Question mode
-     *
-     * Multiple choice works.
-     * Typed mode will be added later.
      */
     val multipleChoiceButton =
         document.getElementById(
@@ -481,6 +479,8 @@ private fun setupButtons() {
         ) as HTMLButtonElement
 
     multipleChoiceButton.onclick = {
+
+        typedMode = false
 
         multipleChoiceButton
             .classList
@@ -497,9 +497,12 @@ private fun setupButtons() {
 
     typedButton.onclick = {
 
-        setStartError(
-            "Typed-answer mode is not enabled yet."
-        )
+        typedMode = true
+
+        typedButton.classList.add("active")
+        multipleChoiceButton.classList.remove("active")
+
+        setStartError("")
 
         null
     }
@@ -560,6 +563,16 @@ private fun render(
     gameError.textContent =
         state.error ?: ""
 
+    if (state.gameOver) {
+        stopTimer()
+        showGameOver(state)
+        return
+    }
+
+    if (answered) {
+        return
+    }
+
     if (state.isLoading) {
 
         val questionText =
@@ -569,16 +582,6 @@ private fun render(
 
         questionText.textContent =
             "Loading..."
-
-        return
-    }
-
-    if (state.gameOver) {
-        stopTimer()
-
-        showGameOver(
-            state
-        )
 
         return
     }
@@ -603,9 +606,13 @@ private fun render(
         question.albumArtUrl
     )
 
-    renderChoices(
-        question.choices
-    )
+    if (typedMode) {
+        renderTypedAnswer()
+    } else {
+        renderChoices(
+            question.choices
+        )
+    }
 
     if (
         !answered &&
@@ -709,11 +716,11 @@ private fun renderChoices(
 
         button.innerHTML =
             """
-            <span class="choice-key">
-                $label
-            </span>
-            $choice
-            """.trimIndent()
+              <span class="choice-key">
+                  $label
+              </span>
+              $choice
+              """.trimIndent()
 
         button.onclick = choiceClick@ {
 
@@ -756,8 +763,97 @@ private fun renderChoices(
     }
 }
 
+private fun renderTypedAnswer() {
+
+    val container =
+        document.getElementById(
+            "choices-wrap"
+        ) as HTMLElement
+
+    container.innerHTML =
+        """
+          <form class="typed-answer" id="typed-answer-form">
+              <input
+                  id="typed-answer-input"
+                  type="text"
+                  placeholder="Type your answer"
+                  aria-label="Your answer"
+                  autocomplete="off"
+              />
+              <button id="typed-answer-submit" type="submit">
+                  submit
+              </button>
+          </form>
+          """.trimIndent()
+
+    val input =
+        document.getElementById(
+            "typed-answer-input"
+        ) as HTMLInputElement
+
+    val form =
+        document.getElementById(
+            "typed-answer-form"
+        ) as org.w3c.dom.HTMLFormElement
+
+    form.onsubmit = { event ->
+        event.preventDefault()
+        submitTypedAnswer(input.value)
+        null
+    }
+
+    input.focus()
+}
+
+private fun submitTypedAnswer(
+    input: String
+) {
+    val answer = input.trim()
+
+    if (answer.isEmpty() || answered) {
+        return
+    }
+
+    answered = true
+    stopTimer()
+    disableAnswerControls()
+
+    scope.launch {
+        val oldScore = gameClient.state.value.score
+        val newState = gameClient.answer(answer)
+
+        if (newState.error == null) {
+            showAnswerResult(
+                selectedButton = null,
+                oldScore = oldScore,
+                newState = newState
+            )
+        } else {
+            // GameClient returns request failures in its state.
+            // Keep the entered answer available for a retry.
+            answered = false
+            (document.getElementById("game-error") as HTMLElement)
+                .textContent = newState.error
+            (document.getElementById("typed-answer-input") as? HTMLInputElement)
+                ?.disabled = false
+            (document.getElementById("typed-answer-submit") as? HTMLButtonElement)
+                ?.disabled = false
+            startTimer()
+        }
+    }
+}
+
+private fun disableAnswerControls() {
+    disableChoices()
+
+    (document.getElementById("typed-answer-input") as? HTMLInputElement)
+        ?.disabled = true
+    (document.getElementById("typed-answer-submit") as? HTMLButtonElement)
+        ?.disabled = true
+}
+
 private fun showAnswerResult(
-    selectedButton: HTMLButtonElement,
+    selectedButton: HTMLButtonElement?,
     oldScore: Int,
     newState: GameState
 ) {
@@ -782,8 +878,8 @@ private fun showAnswerResult(
     if (pointsGained > 0) {
 
         selectedButton
-            .classList
-            .add("correct")
+            ?.classList
+            ?.add("correct")
 
         banner.className =
             "result-banner show correct"
@@ -799,8 +895,8 @@ private fun showAnswerResult(
     } else {
 
         selectedButton
-            .classList
-            .add("wrong")
+            ?.classList
+            ?.add("wrong")
 
         banner.className =
             "result-banner show wrong"
@@ -1045,14 +1141,14 @@ private suspend fun loadLeaderboard() {
 
             container.innerHTML =
                 """
-                <div style="
-                    font-size:13px;
-                    color:var(--muted);
-                    padding:8px 0
-                ">
-                    no scores yet
-                </div>
-                """.trimIndent()
+                  <div style="
+                      font-size:13px;
+                      color:var(--muted);
+                      padding:8px 0
+                  ">
+                      no scores yet
+                  </div>
+                  """.trimIndent()
 
             return
         }
@@ -1085,18 +1181,18 @@ private suspend fun loadLeaderboard() {
 
             row.innerHTML =
                 """
-                <div class="lb-rank $rankClass">
-                    ${index + 1}
-                </div>
+                  <div class="lb-rank $rankClass">
+                      ${index + 1}
+                  </div>
 
-                <div class="lb-name">
-                    ${score.playerName}
-                </div>
+                  <div class="lb-name">
+                      ${score.playerName}
+                  </div>
 
-                <div class="lb-pts $pointsClass">
-                    ${score.score}pts
-                </div>
-                """.trimIndent()
+                  <div class="lb-pts $pointsClass">
+                      ${score.score}pts
+                  </div>
+                  """.trimIndent()
 
             container.appendChild(
                 row
@@ -1234,7 +1330,7 @@ private fun startTimer() {
 
                         answered = true
 
-                        disableChoices()
+                        disableAnswerControls()
 
                         scope.launch {
 
