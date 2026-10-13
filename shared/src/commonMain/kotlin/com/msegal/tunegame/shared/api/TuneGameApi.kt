@@ -2,6 +2,8 @@ package com.msegal.tunegame.shared.api
 
 interface TuneGameApi {
 
+    suspend fun getSpotifyPlaylists(): List<SpotifyPlaylist>
+
     suspend fun newGame(
         playlistId: String? = null
     ): NewGameResponse

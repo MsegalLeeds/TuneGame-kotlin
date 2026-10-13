@@ -17,6 +17,24 @@ class RealSpotifyService(
     private val accessToken: suspend () -> String?
 ) : SpotifyService {
 
+    override suspend fun getUserPlaylists(): List<SpotifyPlaylistMetadata> {
+        val token = accessToken() ?: error("Spotify is not connected")
+        val playlists = mutableListOf<SpotifyPlaylistMetadata>()
+        var offset = 0
+        do {
+            val response = client.get("https://api.spotify.com/v1/me/playlists") {
+                bearerAuth(token)
+                parameter("limit", 50)
+                parameter("offset", offset)
+            }
+            check(response.status.isSuccess()) { "Unable to load Spotify playlists" }
+            val page = response.body<SpotifyUserPlaylistsResponse>()
+            playlists += page.items.filterNotNull()
+            offset += 50
+        } while (page.next != null && page.items.isNotEmpty() && offset <= 100_000)
+        return playlists.distinctBy { it.id }
+    }
+
     override suspend fun searchTrack(
         song: String,
         artist: String
