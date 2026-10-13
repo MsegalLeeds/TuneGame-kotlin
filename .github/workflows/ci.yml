@@ -16,6 +16,7 @@ jobs:
   test:
     name: Test and build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -35,7 +36,7 @@ jobs:
         uses: gradle/actions/wrapper-validation@v4
 
       - name: Run server tests
-        run: ./gradlew :server:test
+        run: ./gradlew :server:test :shared:jvmTest
 
       - name: Run shared browser tests
         run: ./gradlew :shared:jsBrowserTest
@@ -44,4 +45,23 @@ jobs:
         run: ./gradlew :shared:jsBrowserDistribution
 
       - name: Build server distribution
-        run: ./gradlew :server:installDist
+        run: ./gradlew :server:installDist :server:distZip
+
+      - name: Smoke test installed release
+        run: python3 scripts/smoke_release.py
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: tunegame-server
+          path: server/build/distributions/*.zip
+          if-no-files-found: error
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            server/build/reports/tests/
+            shared/build/reports/tests/

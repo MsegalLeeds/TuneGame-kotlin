@@ -453,3 +453,24 @@ The approximate sequence is:
 7. Android client
 8. iOS client
 9. final project and portfolio polish
+
+## Choose playlists from your Spotify account
+
+After connecting Spotify, the start screen automatically loads **Your Spotify playlists**. Choose one to save and select it as the game source. The picker loads subsequent pages, offers refresh and retry, and hides/clears its choices when Spotify is disconnected. Pasting a playlist URL still works.
+
+`GET /spotify/playlists` returns `[{"id":"…","name":"…"}]` for the connected visitor. It uses the server-held access token and existing `playlist-read-private` and `playlist-read-collaborative` scopes. Disconnected sessions receive 401; upstream failures receive a generic 503. Some followed playlists may be listed but unavailable for gameplay under Spotify's current API restrictions.
+
+### Public-launch blocker
+
+Spotify's [Developer Policy](https://developer.spotify.com/policy) prohibits games, including trivia quizzes. Resolve this with Spotify or use an appropriately licensed source before publicly launching Spotify-powered gameplay. Automated tests use simulated Spotify responses; they do not establish launch approval or verify live OAuth/playback.
+
+### Release verification
+
+```sh
+./gradlew :server:test :shared:jvmTest :shared:jsBrowserTest :server:installDist :server:distZip
+python3 scripts/smoke_release.py
+```
+
+Chrome/Chromium is required for browser tests; set `CHROME_BIN` if needed. CI uploads the release ZIP and test reports. The smoke script starts the installed server with a temporary database, verifies packaged browser assets, visitor isolation, three rounds, game over, and score persistence. It never uses Spotify credentials.
+
+Before upgrading an existing deployment, stop the server and back up SQLite. Legacy playlist migration preserves unowned rows but hides them from new sessions. To roll back to the old schema, restore the backup and previous distribution together. Keep SQLite and its Spotify refresh tokens private, and use one server instance behind an HTTPS reverse proxy with request-size and per-client rate limits. Games do not survive restarts; saved playlists belong to a browser session rather than a permanent account.
