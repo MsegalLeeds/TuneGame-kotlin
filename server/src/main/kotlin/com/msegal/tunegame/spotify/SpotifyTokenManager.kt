@@ -76,6 +76,16 @@ class SpotifyTokenManager(
         )
     }
 
+    fun hasStoredAuth(
+        sessionId: String
+    ): Boolean =
+        accessTokens.containsKey(
+            sessionId
+        ) ||
+                tokenRepository.getRefreshToken(
+                    sessionId
+                ) != null
+
     fun logout(
         sessionId: String
     ) {

@@ -144,14 +144,11 @@ fun Route.spotifyRoutes(
             call.getOrCreateUserSession()
 
         val connected =
-            try {
-                spotifyTokenManager
-                    ?.getAccessToken(
-                        session.id
-                    ) != null
-            } catch (e: Exception) {
-                false
-            }
+            spotifyTokenManager
+                ?.hasStoredAuth(
+                    session.id
+                )
+                ?: false
 
         call.respond(
             mapOf(

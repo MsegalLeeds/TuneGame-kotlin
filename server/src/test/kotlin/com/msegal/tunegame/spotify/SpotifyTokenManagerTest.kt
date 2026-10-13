@@ -4,6 +4,8 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class SpotifyTokenManagerTest {
 
@@ -433,6 +435,54 @@ class SpotifyTokenManagerTest {
                 manager.getAccessToken(
                     "session-b"
                 )
+            )
+        }
+
+    @Test
+    fun `stored auth can be checked without refreshing access token`() =
+        runTest {
+
+            val provider =
+                FakeTokenProvider()
+
+            val repository =
+                SpotifyTokenRepository(
+                    databaseUrl =
+                        "jdbc:sqlite::memory:"
+                )
+
+            val manager =
+                SpotifyTokenManager(
+                    tokenService =
+                        provider,
+                    tokenRepository =
+                        repository,
+                    clock =
+                        { 0L }
+                )
+
+            repository.saveRefreshToken(
+                sessionId =
+                    "session-1",
+                refreshToken =
+                    "refresh-1"
+            )
+
+            assertTrue(
+                manager.hasStoredAuth(
+                    "session-1"
+                )
+            )
+
+            assertFalse(
+                manager.hasStoredAuth(
+                    "session-2"
+                )
+            )
+
+            assertEquals(
+                0,
+                provider.refreshCalls
             )
         }
 }
