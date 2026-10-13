@@ -29,7 +29,7 @@ private var fullSongMode = false
 
 private val api =
     createTuneGameApi(
-        "http://127.0.0.1:8080"
+        serverUrl
     )
 
 private val gameClient =
@@ -61,6 +61,7 @@ private fun setupButtons() {
                 as HTMLButtonElement
 
     startButton.onclick = {
+        startButton.disabled = true
         scope.launch {
             answered = false
             resetResult()
@@ -73,6 +74,7 @@ private fun setupButtons() {
             val state =
                 gameClient.state.value
 
+            startButton.disabled = false
             if (state.error != null) {
                 showScreen("screen-start")
 
@@ -749,13 +751,11 @@ private fun renderChoices(
                 "${index + 1}"
             }
 
-        button.innerHTML =
-            """
-              <span class="choice-key">
-                  $label
-              </span>
-              $choice
-              """.trimIndent()
+        val key = document.createElement("span") as HTMLElement
+        key.className = "choice-key"
+        key.textContent = label
+        button.appendChild(key)
+        button.appendChild(document.createTextNode(choice))
 
         button.onclick = choiceClick@ {
 
@@ -782,6 +782,11 @@ private fun renderChoices(
                         choice
                     )
 
+                if (newState.error != null) {
+                    answered = false
+                    render(newState)
+                    return@launch
+                }
                 showAnswerResult(
                     selectedButton = button,
                     oldScore = oldScore,
@@ -1221,7 +1226,7 @@ private suspend fun loadLeaderboard() {
                   </div>
 
                   <div class="lb-name">
-                      ${score.playerName}
+
                   </div>
 
                   <div class="lb-pts $pointsClass">
@@ -1229,9 +1234,8 @@ private suspend fun loadLeaderboard() {
                   </div>
                   """.trimIndent()
 
-            container.appendChild(
-                row
-            )
+            row.querySelector(".lb-name")?.textContent = score.playerName
+            container.appendChild(row)
         }
 
     } catch (e: Exception) {
@@ -1374,9 +1378,12 @@ private fun startTimer() {
                                     ""
                                 )
 
-                            showTimeoutResult(
-                                state
-                            )
+                            if (state.error != null) {
+                                answered = false
+                                render(state)
+                            } else {
+                                showTimeoutResult(state)
+                            }
                         }
                     }
                 }

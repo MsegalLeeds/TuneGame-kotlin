@@ -24,7 +24,7 @@ fun Route.playlistRoutes(
     get("/playlist") {
 
         call.respond(
-            playlistRepository.getAll()
+            playlistRepository.getAll(call.getOrCreateUserSession().id)
         )
     }
 
@@ -100,7 +100,8 @@ fun Route.playlistRoutes(
                     name =
                         spotifyName,
                     spotifyPlaylistId =
-                        request.spotifyPlaylistId
+                        request.spotifyPlaylistId,
+                    ownerSessionId = userSession.id
                 )
 
             call.respond(
@@ -142,7 +143,8 @@ fun Route.playlistRoutes(
 
         val deleted =
             playlistRepository.delete(
-                id
+                id,
+                call.getOrCreateUserSession().id
             )
 
         if (!deleted) {

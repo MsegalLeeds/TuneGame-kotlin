@@ -3,6 +3,8 @@ package com.msegal.tunegame
 import com.msegal.tunegame.game.Song
 import com.msegal.tunegame.spotify.FakeSpotifyService
 import io.ktor.client.request.*
+import io.ktor.client.plugins.cookies.HttpCookies
+import kotlinx.serialization.json.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
@@ -36,6 +38,7 @@ class ApplicationTest {
 
     @Test
     fun `server root responds`() = testApplication {
+        val client = createClient { install(HttpCookies) }
 
         application {
             module(
@@ -62,6 +65,7 @@ class ApplicationTest {
 
     @Test
     fun `new game creates game`() = testApplication {
+        val client = createClient { install(HttpCookies) }
 
         application {
             module(
@@ -99,6 +103,7 @@ class ApplicationTest {
     @Test
     fun `question without game id returns bad request`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -128,6 +133,7 @@ class ApplicationTest {
     @Test
     fun `invalid game id returns not found`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -159,6 +165,7 @@ class ApplicationTest {
     @Test
     fun `question response does not expose correct answer`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -248,6 +255,7 @@ class ApplicationTest {
     @Test
     fun `playlist can be created`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -304,6 +312,7 @@ class ApplicationTest {
     @Test
     fun `playlist endpoint lists created playlists`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -362,6 +371,7 @@ class ApplicationTest {
     @Test
     fun `playlist with blank name is rejected`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -398,6 +408,7 @@ class ApplicationTest {
     @Test
     fun `unfinished game score cannot be submitted`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -459,6 +470,7 @@ class ApplicationTest {
     @Test
     fun `score submission rejects unknown game`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -495,6 +507,7 @@ class ApplicationTest {
     @Test
     fun `negative score is rejected`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -531,6 +544,7 @@ class ApplicationTest {
     @Test
     fun `finished game score can only be submitted once`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -715,6 +729,7 @@ class ApplicationTest {
     @Test
     fun `cannot request another question while one is active`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -773,6 +788,7 @@ class ApplicationTest {
     @Test
     fun `spotify play uses POST`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -798,6 +814,7 @@ class ApplicationTest {
     @Test
     fun `spotify pause uses POST`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -902,6 +919,7 @@ class ApplicationTest {
     @Test
     fun `playlist creation requires Spotify connection`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             application {
                 module(
@@ -944,19 +962,12 @@ class ApplicationTest {
     @Test
     fun `starting saved playlist game requires Spotify connection`() =
         testApplication {
+            val client = createClient { install(HttpCookies) }
 
             val playlistRepository =
                 PlaylistRepository(
                     databaseUrl =
                         "jdbc:sqlite::memory:"
-                )
-
-            val playlist =
-                playlistRepository.create(
-                    name =
-                        "Classic Rock",
-                    spotifyPlaylistId =
-                        "spotify123"
                 )
 
             application {
@@ -969,6 +980,14 @@ class ApplicationTest {
                         playlistRepository
                 )
             }
+
+            val sessionId = Json.parseToJsonElement(client.get("/session").bodyAsText())
+                .jsonObject["sessionId"]!!.jsonPrimitive.content
+            val playlist = playlistRepository.create(
+                name = "Classic Rock",
+                spotifyPlaylistId = "spotify123",
+                ownerSessionId = sessionId
+            )
 
             val response =
                 client.post("/new-game") {

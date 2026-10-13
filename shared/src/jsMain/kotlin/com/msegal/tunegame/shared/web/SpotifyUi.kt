@@ -8,15 +8,20 @@ import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLButtonElement
 import org.w3c.dom.HTMLElement
 
-private const val SERVER_URL =
-    "http://127.0.0.1:8080"
+// The packaged site uses the same origin. Port 8081 is only the local dev server.
+internal val serverUrl: String =
+    if (window.location.port == "8081" && window.location.hostname in listOf("localhost", "127.0.0.1")) {
+        "${window.location.protocol}//${window.location.hostname}:8080"
+    } else {
+        window.location.origin
+    }
 
 private val spotifyScope =
     MainScope()
 
 private val spotifyApi =
     createTuneGameApi(
-        SERVER_URL
+        serverUrl
     )
 
 fun setupSpotifyUi() {
@@ -36,7 +41,7 @@ fun setupSpotifyUi() {
     connectButton.onclick = {
 
         window.location.href =
-            "$SERVER_URL/spotify/login"
+            "$serverUrl/spotify/login"
 
         null
     }

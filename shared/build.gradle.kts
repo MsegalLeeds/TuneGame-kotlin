@@ -11,7 +11,11 @@ kotlin {
     jvm()
 
     js(IR) {
-        browser()
+        browser {
+            testTask {
+                useKarma { useChromeHeadless() }
+            }
+        }
         binaries.executable()
     }
 
@@ -36,7 +40,7 @@ kotlin {
                 "io.ktor:ktor-serialization-kotlinx-json:3.3.0"
             )
             implementation(
-                "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0"
+                "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2"
             )
         }
 
