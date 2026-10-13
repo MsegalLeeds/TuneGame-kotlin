@@ -5,6 +5,7 @@ import com.msegal.tunegame.session.getOrCreateUserSession
 import com.msegal.tunegame.spotify.SpotifyAuth
 import com.msegal.tunegame.spotify.SpotifyService
 import com.msegal.tunegame.spotify.SpotifyTokenManager
+import kotlinx.coroutines.CancellationException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondRedirect
@@ -18,8 +19,24 @@ fun Route.spotifyRoutes(
     spotifyTokenManager: SpotifyTokenManager?,
     spotifyServiceForSession:
         (String) -> SpotifyService,
-    frontendUrl: String
+    frontendUrl: String,
+    spotifyConnectedForSession: suspend (String) -> Boolean
 ) {
+
+    get("/spotify/playlists") {
+        val session = call.getOrCreateUserSession()
+        try {
+            if (!spotifyConnectedForSession(session.id)) {
+                call.respond(HttpStatusCode.Unauthorized, ErrorResponse("Spotify account is not connected"))
+                return@get
+            }
+            call.respond(spotifyServiceForSession(session.id).getUserPlaylists())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Unable to load Spotify playlists"))
+        }
+    }
 
     get("/spotify/login") {
 
@@ -149,6 +166,7 @@ fun Route.spotifyRoutes(
                     session.id
                 )
                 ?: false
+
 
         call.respond(
             mapOf(

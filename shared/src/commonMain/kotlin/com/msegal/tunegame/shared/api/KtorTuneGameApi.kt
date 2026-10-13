@@ -13,6 +13,9 @@ class KtorTuneGameApi(
     private val client: HttpClient
 ) : TuneGameApi {
 
+    override suspend fun getSpotifyPlaylists(): List<SpotifyPlaylist> =
+        handleResponse(client.get("$baseUrl/spotify/playlists"))
+
     private suspend inline fun <reified T> handleResponse(
         response: HttpResponse
     ): T {

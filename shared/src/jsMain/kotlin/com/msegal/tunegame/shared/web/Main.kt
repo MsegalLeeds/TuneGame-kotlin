@@ -38,7 +38,9 @@ private val gameClient =
 fun main() {
 
     setupButtons()
-    setupSpotifyUi()
+    setupSpotifyUi { playlist ->
+        useSpotifyPlaylist(playlist.id, playlist.name)
+    }
 
     scope.launch {
         loadSavedPlaylists()
@@ -282,45 +284,8 @@ private fun setupButtons() {
                     isError = false
                 )
 
-                val playlist =
-                    api.createPlaylist(
-                        name = "Spotify Playlist",
-                        spotifyPlaylistId =
-                            spotifyPlaylistId
-                    )
-
-                selectedPlaylistId =
-                    playlist.id
-
-                loadSavedPlaylists()
-
-                savedPlaylists.value =
-                    playlist.id
-
+                useSpotifyPlaylist(spotifyPlaylistId, "Spotify Playlist")
                 playlistInput.value = ""
-
-                val status =
-                    document.getElementById(
-                        "playlist-status"
-                    ) as HTMLElement
-
-                status.textContent =
-                    "Using ${playlist.name}"
-
-                status.classList.add(
-                    "custom"
-                )
-
-                defaultPlaylistButton.disabled =
-                    false
-
-                deletePlaylistButton.disabled =
-                    false
-
-                setPlaylistMessage(
-                    "${playlist.name} loaded.",
-                    isError = false
-                )
 
             } catch (e: Exception) {
                 setPlaylistMessage(
@@ -1597,4 +1562,17 @@ private suspend fun loadSavedPlaylists() {
 
     savedPlaylists.value =
         previouslySelectedId ?: ""
+}
+
+private suspend fun useSpotifyPlaylist(spotifyPlaylistId: String, name: String) {
+    val playlist = api.createPlaylist(name, spotifyPlaylistId)
+    selectedPlaylistId = playlist.id
+    loadSavedPlaylists()
+    (document.getElementById("saved-playlists") as HTMLSelectElement).value = playlist.id
+    val status = document.getElementById("playlist-status") as HTMLElement
+    status.textContent = "Using ${playlist.name}"
+    status.classList.add("custom")
+    (document.getElementById("btn-default-list") as HTMLButtonElement).disabled = false
+    (document.getElementById("delete-playlist-btn") as HTMLButtonElement).disabled = false
+    setPlaylistMessage("${playlist.name} loaded.", isError = false)
 }
