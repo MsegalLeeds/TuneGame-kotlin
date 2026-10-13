@@ -574,15 +574,6 @@ private fun setupButtons() {
 
         null
     }
-
-    fullButton.onclick = {
-
-        setStartError(
-            "Full-song playback is not enabled yet."
-        )
-
-        null
-    }
 }
 
 private fun render(
