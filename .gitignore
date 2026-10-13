@@ -6,17 +6,24 @@
 build/
 **/build/
 
-# IntelliJ
+# Kotlin
+.kotlin/
+kotlin-js-store/
+
+# IntelliJ / Android Studio
 .idea/
 *.iml
 
 # macOS
 .DS_Store
 
-# dataBase
+# Local runtime files
+cookies.txt
+
+# Database
 tunegame.db
 tunegame.db-shm
 tunegame.db-wal
 
-# Local Properties
+# Local properties
 local.properties
