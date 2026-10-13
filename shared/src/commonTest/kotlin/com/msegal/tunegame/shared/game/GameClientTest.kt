@@ -12,6 +12,8 @@ class GameClientTest {
 
     private class FakeTuneGameApi : TuneGameApi {
 
+        override suspend fun getSpotifyPlaylists(): List<SpotifyPlaylist> = emptyList()
+
         var submittedPlayerName: String? = null
         var submittedGameId: String? = null
 

@@ -28,6 +28,7 @@ dependencies {
 
     // Tests
     testImplementation(kotlin("test"))
+    testImplementation("io.ktor:ktor-client-mock:3.3.0")
     testImplementation("io.ktor:ktor-server-test-host:3.3.0")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")

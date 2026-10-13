@@ -313,7 +313,8 @@ fun Application.module(
                 spotifyTokenManager,
             spotifyServiceForSession =
                 spotifyServiceForSession,
-            frontendUrl = "${config.publicUrl}/play"
+            frontendUrl = "${config.publicUrl}/play",
+            spotifyConnectedForSession = spotifyConnectedForSession
         )
     }
 

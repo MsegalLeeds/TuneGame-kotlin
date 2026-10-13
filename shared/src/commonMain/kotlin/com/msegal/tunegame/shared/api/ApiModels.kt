@@ -87,3 +87,5 @@ data class SpotifyStatusResponse(
 data class ErrorResponse(
     val error: String
 )
+@Serializable
+data class SpotifyPlaylist(val id: String, val name: String)

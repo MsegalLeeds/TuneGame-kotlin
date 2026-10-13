@@ -4,6 +4,9 @@ import com.msegal.tunegame.game.Song
 
 class FakeSpotifyService : SpotifyService {
 
+    var userPlaylists: List<SpotifyPlaylistMetadata> = emptyList()
+    override suspend fun getUserPlaylists() = userPlaylists
+
     var lastPlayedUri: String? = null
     var paused = false
 

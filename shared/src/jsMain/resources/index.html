@@ -108,7 +108,10 @@
 
         .playlist-status { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
         .playlist-status.custom { color: var(--green); }
-        .playlist-row { display: flex; gap: 8px; margin-top: 8px; }
+        .playlist-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 8px; }
+        .playlist-row input { min-width: 0; grid-column: 1; grid-row: 1; }
+        #playlist-load-btn { grid-column: 2; grid-row: 1; }
+        #saved-playlists { min-width: 0; width: 100%; color: var(--text); background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
         .playlist-hint { font-size: 11px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
         .playlist-msg { font-size: 12px; min-height: 16px; margin-top: 8px; }
         .playlist-msg.error { color: var(--red); }
@@ -560,7 +563,11 @@
         }
 
 
-    </style>
+            .spotify-playlist-picker { margin-top: 16px; }
+        .spotify-playlist-picker label { display: block; margin-bottom: 8px; font-size: 13px; }
+        .spotify-playlist-picker select { width: 100%; padding: 12px; margin-bottom: 8px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+        .spotify-playlist-picker p { font-size: 13px; color: var(--muted); }
+</style>
 </head>
 <body>
 <div class="app">
@@ -585,27 +592,6 @@
                     <button class="mode-btn" id="btn-full">full song</button>
                 </div>
             </div>
-            <div>
-                <div class="mode-label">song source</div>
-                <div class="playlist-status" id="playlist-status">Using the built-in classic rock list</div>
-                <div class="playlist-row">
-                    <input class="typed-input" id="playlist-url" placeholder="paste a Spotify playlist link..."/>
-                    <select id="saved-playlists">
-                        <option value="">Default playlist</option>
-
-                    </select>
-                    <button class="submit-btn" id="playlist-load-btn">load</button>
-                    <button id="delete-playlist-btn" type="button">
-                        Delete playlist
-                    </button>
-                </div>
-                <button class="mode-btn" id="btn-default-list" style="width:100%;margin-top:8px" disabled>use built-in list</button>
-                <div class="playlist-msg" id="playlist-msg"></div>
-                <div class="playlist-hint">Works with playlists you created or collaborate on. In Spotify: playlist menu, Share, Copy link.</div>
-            </div>
-            <button class="start-btn" id="start-button">play</button>
-            <div role="alert" class="error-msg" id="start-error"></div>
-        </div>
         <div>
             <div class="mode-label">
                 spotify account
@@ -636,6 +622,27 @@
                     disconnect
                 </button>
             </div>
+        </div>
+            <div>
+                <div class="mode-label">song source</div>
+                <div class="playlist-status" id="playlist-status">Using the built-in classic rock list</div>
+                <div class="playlist-row">
+                    <input class="typed-input" id="playlist-url" placeholder="paste a Spotify playlist link..."/>
+                    <select id="saved-playlists" aria-label="Saved playlists">
+                        <option value="">Default playlist</option>
+
+                    </select>
+                    <button class="submit-btn" id="playlist-load-btn">load</button>
+                    <button class="mode-btn" id="delete-playlist-btn" type="button">
+                        Delete playlist
+                    </button>
+                </div>
+                <button class="mode-btn" id="btn-default-list" style="width:100%;margin-top:8px" disabled>use built-in list</button>
+                <div class="playlist-msg" id="playlist-msg"></div>
+                <div class="playlist-hint">Works with playlists you created or collaborate on. In Spotify: playlist menu, Share, Copy link.</div>
+            </div>
+            <button class="start-btn" id="start-button">play</button>
+            <div role="alert" class="error-msg" id="start-error"></div>
         </div>
     </div>
 

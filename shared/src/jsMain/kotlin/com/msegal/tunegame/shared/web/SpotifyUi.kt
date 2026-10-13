@@ -1,6 +1,7 @@
 package com.msegal.tunegame.shared.web
 
 import com.msegal.tunegame.shared.api.createTuneGameApi
+import com.msegal.tunegame.shared.api.SpotifyPlaylist
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.MainScope
@@ -24,9 +25,13 @@ private val spotifyApi =
         serverUrl
     )
 
-fun setupSpotifyUi() {
+private lateinit var playlistPicker: SpotifyPlaylistPicker
+
+fun setupSpotifyUi(onPlaylistSelected: suspend (SpotifyPlaylist) -> Unit) {
 
     createSpotifyControls()
+    playlistPicker = SpotifyPlaylistPicker(spotifyScope, spotifyApi::getSpotifyPlaylists, onPlaylistSelected)
+    document.getElementById("playlist-status")?.parentNode?.appendChild(playlistPicker.element)
 
     val connectButton =
         document.getElementById(
@@ -53,6 +58,7 @@ fun setupSpotifyUi() {
             try {
 
                 spotifyApi.disconnectSpotify()
+                playlistPicker.setConnected(false)
 
                 updateSpotifyStatus(
                     connected = false,
@@ -161,6 +167,7 @@ private suspend fun refreshSpotifyStatus() {
         val status =
             spotifyApi.getSpotifyStatus()
 
+        playlistPicker.setConnected(status.connected)
         if (status.connected) {
 
             updateSpotifyStatus(

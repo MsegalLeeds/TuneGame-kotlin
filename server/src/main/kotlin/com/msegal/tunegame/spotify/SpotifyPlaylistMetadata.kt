@@ -7,3 +7,9 @@ data class SpotifyPlaylistMetadata(
     val id: String,
     val name: String
 )
+
+@Serializable
+internal data class SpotifyUserPlaylistsResponse(
+    val items: List<SpotifyPlaylistMetadata?>,
+    val next: String? = null
+)
