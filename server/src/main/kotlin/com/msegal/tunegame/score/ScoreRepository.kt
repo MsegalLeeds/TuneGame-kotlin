@@ -7,7 +7,7 @@ import kotlin.jvm.Synchronized
 
 class ScoreRepository(
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
-) {
+) : AutoCloseable {
 
     private val connection: Connection =
         DriverManager.getConnection(databaseUrl)
@@ -134,4 +134,6 @@ class ScoreRepository(
 
         return newScore
     }
+    @Synchronized
+    override fun close() = connection.close()
 }

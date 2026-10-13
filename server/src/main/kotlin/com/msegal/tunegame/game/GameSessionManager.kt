@@ -18,14 +18,16 @@ class GameSessionManager(
 
     private data class SessionEntry(
         val session: GameSession,
-        val createdAt: Long
+        val createdAt: Long,
+        val ownerSessionId: String
     )
 
     private val sessions =
         ConcurrentHashMap<String, SessionEntry>()
 
     fun createGame(
-        gameSongs: List<Song> = songs
+        gameSongs: List<Song> = songs,
+        ownerSessionId: String = ""
     ): String {
 
         require(gameSongs.isNotEmpty()) {
@@ -47,14 +49,16 @@ class GameSessionManager(
                 session =
                     GameSession(engine),
                 createdAt =
-                    clock()
+                    clock(),
+                ownerSessionId = ownerSessionId
             )
 
         return gameId
     }
 
     fun getGame(
-        gameId: String
+        gameId: String,
+        ownerSessionId: String = ""
     ): GameSession? {
 
         val entry =
@@ -72,6 +76,8 @@ class GameSessionManager(
 
             return null
         }
+
+        if (entry.ownerSessionId != ownerSessionId) return null
 
         return entry.session
     }

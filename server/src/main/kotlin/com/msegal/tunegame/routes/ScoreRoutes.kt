@@ -5,6 +5,8 @@ import com.msegal.tunegame.api.ErrorResponse
 import com.msegal.tunegame.game.GameSessionManager
 import com.msegal.tunegame.score.Score
 import com.msegal.tunegame.score.ScoreRepository
+import com.msegal.tunegame.session.getOrCreateUserSession
+import kotlinx.coroutines.sync.withLock
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -27,11 +29,11 @@ fun Route.scoreRoutes(
         val request =
             call.receive<CreateScoreRequest>()
 
-        if (request.playerName.isBlank()) {
+        if (request.playerName.isBlank() || request.playerName.length > 20) {
             call.respond(
                 HttpStatusCode.BadRequest,
                 ErrorResponse(
-                    "playerName is required"
+                    "playerName is required and must be at most 20 characters"
                 )
             )
             return@post
@@ -49,7 +51,8 @@ fun Route.scoreRoutes(
 
         val session =
             sessionManager.getGame(
-                request.gameId
+                request.gameId,
+                call.getOrCreateUserSession().id
             )
 
         if (session == null) {
@@ -63,7 +66,7 @@ fun Route.scoreRoutes(
         }
 
         val outcome =
-            synchronized(session) {
+            session.mutex.withLock {
 
                 when {
                     session.scoreSubmitted -> {
@@ -84,7 +87,7 @@ fun Route.scoreRoutes(
                         val score =
                             scoreRepository.create(
                                 playerName =
-                                    request.playerName,
+                                    request.playerName.trim(),
                                 score =
                                     session.engine.state.score
                             )

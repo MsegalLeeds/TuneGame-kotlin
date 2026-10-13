@@ -18,6 +18,19 @@ import com.msegal.tunegame.spotify.SpotifyService
 import com.msegal.tunegame.spotify.SpotifyTokenManager
 import com.msegal.tunegame.spotify.SpotifyTokenRepository
 import com.msegal.tunegame.spotify.SpotifyTokenService
+import com.msegal.tunegame.api.ErrorResponse
+import io.ktor.server.application.log
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.plugins.ratelimit.RateLimit
+import io.ktor.server.http.content.staticResources
+import io.ktor.server.response.respondRedirect
+import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
+import io.ktor.server.application.ApplicationStopped
+import io.ktor.client.plugins.HttpTimeout
+import kotlinx.coroutines.CancellationException
+import kotlin.time.Duration.Companion.seconds
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
@@ -39,24 +52,28 @@ import io.ktor.server.sessions.cookie
 import kotlinx.serialization.json.Json
 
 fun main() {
+    val config = ServerConfig.fromEnvironment()
     embeddedServer(
         Netty,
-        port = 8080,
+        port = config.port,
         host = "0.0.0.0",
-        module = Application::module
+        module = { module(SongRepository().loadSongs(), SpotifyConfig.fromEnvironmentOrNull(), databaseUrl = config.databaseUrl, config = config) }
     ).start(wait = true)
 }
 
 const val TIME_LIMIT_SECONDS = 30.0
 
 fun Application.module() {
+    val config = ServerConfig.fromEnvironment()
     module(
         songs =
             SongRepository()
                 .loadSongs(),
         spotifyConfig =
             SpotifyConfig
-                .fromEnvironmentOrNull()
+                .fromEnvironmentOrNull(),
+        databaseUrl = config.databaseUrl,
+        config = config
     )
 }
 
@@ -65,11 +82,34 @@ fun Application.module(
     spotifyConfig: SpotifyConfig? = null,
     spotifyServiceOverride: SpotifyService? = null,
     databaseUrl: String = "jdbc:sqlite:tunegame.db",
-    playlistRepositoryOverride: PlaylistRepository? = null
+    playlistRepositoryOverride: PlaylistRepository? = null,
+    config: ServerConfig = ServerConfig()
 ) {
 
     install(ServerContentNegotiation) {
         json()
+    }
+
+    install(StatusPages) {
+        exception<BadRequestException> { call, _ ->
+            call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+        }
+        exception<Throwable> { call, cause ->
+            if (cause is CancellationException) throw cause
+            call.application.log.error("Request failed", cause)
+            call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Unable to complete request"))
+        }
+        status(HttpStatusCode.TooManyRequests) { call, status ->
+            call.respond(status, ErrorResponse("Too many requests. Please try again shortly."))
+        }
+    }
+
+    install(RateLimit) {
+        global {
+            rateLimiter(limit = 300, refillPeriod = 60.seconds)
+            // Use the socket peer, never an untrusted forwarding header.
+            requestKey { call -> call.request.local.remoteHost }
+        }
     }
 
     install(Sessions) {
@@ -78,7 +118,8 @@ fun Application.module(
         ) {
             cookie.path = "/"
             cookie.httpOnly = true
-            cookie.secure = false
+            cookie.secure = config.secureCookies
+            transform(SessionTransportTransformerMessageAuthentication(config.sessionSigningKey))
 
             cookie.extensions[
                 "SameSite"
@@ -86,33 +127,15 @@ fun Application.module(
         }
     }
 
-    install(CORS) {
-
-        allowHost(
-            "localhost:8081",
-            schemes =
-                listOf("http")
-        )
-
-        allowHost(
-            "127.0.0.1:8081",
-            schemes =
-                listOf("http")
-        )
-
-        allowCredentials = true
-
-        allowHeader(
-            HttpHeaders.ContentType
-        )
-
-        allowMethod(
-            HttpMethod.Post
-        )
-
-        allowMethod(
-            HttpMethod.Delete
-        )
+    if (!config.secureCookies) {
+        install(CORS) {
+            allowHost("localhost:8081", schemes = listOf("http"))
+            allowHost("127.0.0.1:8081", schemes = listOf("http"))
+            allowCredentials = true
+            allowHeader(HttpHeaders.ContentType)
+            allowMethod(HttpMethod.Post)
+            allowMethod(HttpMethod.Delete)
+        }
     }
 
     val sessionManager =
@@ -143,6 +166,11 @@ fun Application.module(
         spotifyConfig?.let {
 
             HttpClient(CIO) {
+                install(HttpTimeout) {
+                    requestTimeoutMillis = 8_000
+                    connectTimeoutMillis = 3_000
+                    socketTimeoutMillis = 8_000
+                }
 
                 install(
                     ClientContentNegotiation
@@ -220,7 +248,17 @@ fun Application.module(
             }
         }
 
+    monitor.subscribe(ApplicationStopped) {
+        spotifyClient?.close()
+        spotifyTokenRepository.close()
+        scoreRepository.close()
+        if (playlistRepositoryOverride == null) playlistRepository.close()
+    }
+
     routing {
+        get("/play") { call.respondRedirect("/play/") }
+        staticResources("/play", "web")
+
 
         get("/") {
             call.respondText(
@@ -274,11 +312,12 @@ fun Application.module(
             spotifyTokenManager =
                 spotifyTokenManager,
             spotifyServiceForSession =
-                spotifyServiceForSession
+                spotifyServiceForSession,
+            frontendUrl = "${config.publicUrl}/play"
         )
     }
 
     println(
-        "TuneGame server running on http://localhost:8080"
+        "TuneGame browser available at ${config.publicUrl}/play/"
     )
 }

@@ -6,7 +6,7 @@ import kotlin.jvm.Synchronized
 
 class SpotifyTokenRepository(
     databaseUrl: String = "jdbc:sqlite:tunegame.db"
-) {
+) : AutoCloseable {
 
     private val connection: Connection =
         DriverManager.getConnection(databaseUrl)
@@ -126,4 +126,6 @@ class SpotifyTokenRepository(
             return statement.executeUpdate() > 0
         }
     }
+    @Synchronized
+    override fun close() = connection.close()
 }

@@ -13,13 +13,12 @@ import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 
-private const val FRONTEND_URL =
-    "http://127.0.0.1:8081"
 fun Route.spotifyRoutes(
     spotifyAuth: SpotifyAuth?,
     spotifyTokenManager: SpotifyTokenManager?,
     spotifyServiceForSession:
-        (String) -> SpotifyService
+        (String) -> SpotifyService,
+    frontendUrl: String
 ) {
 
     get("/spotify/login") {
@@ -40,14 +39,11 @@ fun Route.spotifyRoutes(
         val session =
             call.getOrCreateUserSession()
 
-        val (url, state) =
+        val (url, _) =
             auth.createAuthorizationRequest(
                 session.id
             )
 
-        println(
-            "SPOTIFY LOGIN session=${session.id} state=$state"
-        )
 
         call.respondRedirect(url)
     }
@@ -79,7 +75,7 @@ fun Route.spotifyRoutes(
 
         if (error != null) {
             call.respondRedirect(
-                "$FRONTEND_URL/?spotify=error"
+                "$frontendUrl/?spotify=error"
             )
             return@get
         }
@@ -108,9 +104,6 @@ fun Route.spotifyRoutes(
         val session =
             call.getOrCreateUserSession()
 
-        println(
-            "SPOTIFY CALLBACK session=${session.id} state=$state"
-        )
 
         if (
             !auth.validateState(
@@ -135,13 +128,13 @@ fun Route.spotifyRoutes(
         } catch (e: Exception) {
 
             call.respondRedirect(
-                "$FRONTEND_URL/?spotify=error"
+                "$frontendUrl/?spotify=error"
             )
             return@get
         }
 
         call.respondRedirect(
-            "$FRONTEND_URL/?spotify=connected"
+            "$frontendUrl/?spotify=connected"
         )
     }
 
@@ -201,11 +194,6 @@ fun Route.spotifyRoutes(
         val session =
             call.getOrCreateUserSession()
 
-        val spotifyService =
-            spotifyServiceForSession(
-                session.id
-            )
-
         val song =
             call.request
                 .queryParameters["song"]
@@ -229,6 +217,7 @@ fun Route.spotifyRoutes(
 
         try {
 
+            val spotifyService = spotifyServiceForSession(session.id)
             val track =
                 spotifyService.searchTrack(
                     song = song,
@@ -264,11 +253,6 @@ fun Route.spotifyRoutes(
         val session =
             call.getOrCreateUserSession()
 
-        val spotifyService =
-            spotifyServiceForSession(
-                session.id
-            )
-
         val song =
             call.request
                 .queryParameters["song"]
@@ -292,6 +276,7 @@ fun Route.spotifyRoutes(
 
         try {
 
+            val spotifyService = spotifyServiceForSession(session.id)
             val track =
                 spotifyService.searchTrack(
                     song = song,
@@ -334,13 +319,9 @@ fun Route.spotifyRoutes(
         val session =
             call.getOrCreateUserSession()
 
-        val spotifyService =
-            spotifyServiceForSession(
-                session.id
-            )
-
         try {
 
+            val spotifyService = spotifyServiceForSession(session.id)
             spotifyService.pause()
 
             call.respondText(

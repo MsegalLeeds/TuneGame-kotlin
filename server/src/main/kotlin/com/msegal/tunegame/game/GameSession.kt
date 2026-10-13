@@ -1,9 +1,13 @@
 package com.msegal.tunegame.game
 
+import kotlinx.coroutines.sync.Mutex
+
 class GameSession(
     val engine: GameEngine,
     private val clock: () -> Long = System::nanoTime
 ) {
+    val mutex = Mutex()
+
     var currentQuestion: Question? = null
         private set
 

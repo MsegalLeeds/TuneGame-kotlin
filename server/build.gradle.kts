@@ -22,6 +22,10 @@ dependencies {
     implementation("io.ktor:ktor-server-cors:3.3.0")
     implementation("io.ktor:ktor-server-sessions:3.3.0")
 
+    implementation("io.ktor:ktor-server-status-pages:3.3.0")
+    implementation("io.ktor:ktor-server-rate-limit:3.3.0")
+    runtimeOnly("org.slf4j:slf4j-simple:2.0.17")
+
     // Tests
     testImplementation(kotlin("test"))
     testImplementation("io.ktor:ktor-server-test-host:3.3.0")
@@ -42,4 +46,9 @@ application {
 
 tasks.test {
     useJUnitPlatform()
+}
+// Ship the production browser bundle inside the server distribution.
+tasks.processResources {
+    dependsOn(":shared:jsBrowserDistribution")
+    from(project(":shared").layout.buildDirectory.dir("dist/js/productionExecutable")) { into("web") }
 }
