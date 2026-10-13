@@ -20,3 +20,11 @@ tunegame.db-wal
 
 # Local Properties
 local.properties
+
+# Generated Kotlin caches and local session material
+.kotlin/
+cookies.txt
+.env.*
+*.db
+*.db-shm
+*.db-wal

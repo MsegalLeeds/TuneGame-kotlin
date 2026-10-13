@@ -1,90 +1,90 @@
 # TuneGame
 
-TuneGame is a music-quiz application. The Kotlin server runs the game API, manages game and user sessions, stores playlists and scores, and can connect to Spotify for playlist-based games and playback. The repository also contains a Kotlin Multiplatform shared client and a browser UI.
+A Kotlin music quiz with a Ktor server, a Kotlin/JS browser interface, and shared JVM/JS/iOS client code.
 
-## Architecture
+## Run and build
 
-- **`server/`** is a Kotlin/JVM application built with Ktor and Netty. Its entry point is `com.msegal.tunegame.ApplicationKt`; it loads the default song list from `server/src/main/resources/music.csv` and serves HTTP on port `8080`.
-- **Game logic** (`server/.../game/`) manages rounds, answer checking, scoring, streaks, and lives. Game state is held in memory, so active games do not survive a server restart.
-- **Persistence** (`server/.../playlist/`, `score/`, and `spotify/`) uses SQLite. The default database is `tunegame.db` in the working directory.
-- **Spotify integration** (`server/.../spotify/`) handles OAuth, token storage, playlist lookups, track search, and playback. The server starts without Spotify credentials, but the current question endpoint also initializes Spotify playback, so configure Spotify to play a full game.
-- **`shared/`** contains serializable API models and a Ktor client shared across JVM, JavaScript/browser, and iOS targets. The browser UI is in `shared/src/jsMain/`.
+Use Java 21 and the checked-in Gradle wrapper:
 
-The server returns JSON for API responses and uses an HTTP session cookie (`tunegame_session`) to associate Spotify authorization and tokens with a user. API errors generally use `{"error":"..."}`.
-
-## Run the server
-
-Requirements: Java 21. From the repository root:
-
-```bash
+```sh
 ./gradlew :server:run
 ```
 
-The server listens on `http://localhost:8080`. Check that it is responding:
+Open <http://127.0.0.1:8080/play/>. The server serves both the browser bundle and API. The built-in quiz works without Spotify credentials. The root `/` endpoint remains a plain-text health check.
 
-```bash
-curl http://localhost:8080/
+To produce a standalone distribution:
+
+```sh
+./gradlew :server:test :shared:jvmTest :shared:jsBrowserTest :server:installDist :server:distZip
+python3 scripts/smoke_release.py
 ```
 
-The response should be `TuneGame server is running!`. The SQLite database file is created in the current working directory as needed.
+Browser tests require Chrome or Chromium; set `CHROME_BIN` if it is not detected. The ZIP is in `server/build/distributions/`. Extract it and run `bin/server` with Java 21. The shared iOS targets are libraries, not a shipped iOS app; the web release checks cover JVM and JavaScript.
 
-### Configure Spotify (optional)
+## Your Spotify playlists
 
-Without Spotify credentials, the server and default-song games can run, but Spotify login, playlist operations, and playback are unavailable. To enable Spotify, create an application in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard/) and configure its redirect URI as `http://localhost:8080/spotify/callback`. Then set all three variables before launching the server:
+When Spotify is connected, the start screen automatically loads **Your Spotify playlists**. Choose one to save it for your browser session and select it as the game's song source. The picker supports pagination, refresh, empty accounts, and retry after a failed request. Disconnecting hides and clears its choices. Pasting a playlist URL still works.
 
-```bash
-export SPOTIFY_CLIENT_ID="your-client-id"
-export SPOTIFY_CLIENT_SECRET="your-client-secret"
-export SPOTIFY_REDIRECT_URI="http://localhost:8080/spotify/callback"
-./gradlew :server:run
+Only the connected visitor's access token is used. Tokens stay on the server. The list uses Spotify's `GET /v1/me/playlists` endpoint; the existing OAuth scopes include `playlist-read-private` and `playlist-read-collaborative`. Spotify may list followed playlists that its current API does not permit this app to read for gameplay; the game reports failures when loading those playlists. A playlist must have at least four songs.
+
+### Public launch blocker
+
+Spotify's [Developer Policy](https://developer.spotify.com/policy) prohibits games, including trivia quizzes. This repository's Spotify integration must not be described as approved for a public quiz launch. Resolve this with Spotify or use an appropriately licensed source before publishing Spotify-powered gameplay. No live Spotify credentials or playback were used in automated verification; the integration is tested against simulated API responses.
+
+For authorized integration testing, configure an application in the Spotify developer dashboard and set:
+
+```sh
+export SPOTIFY_CLIENT_ID='your-client-id'
+export SPOTIFY_CLIENT_SECRET='your-client-secret'
+export SPOTIFY_REDIRECT_URI='http://127.0.0.1:8080/spotify/callback'
 ```
 
-The browser UI expects to run at `http://127.0.0.1:8081` for Spotify's callback redirect and the server's CORS configuration. The UI is a separate browser target; it is not served by the Ktor server.
+The registered callback must exactly match `SPOTIFY_REDIRECT_URI`. The callback returns to `${PUBLIC_URL}/play/`. Spotify playback needs a supported account and active Spotify device. Without Spotify, play the text quiz using the built-in song list.
+
+## Public deployment configuration
+
+Set these environment variables in your host's secret/configuration manager:
+
+| Variable | Value |
+| --- | --- |
+| `PUBLIC_URL` | HTTPS origin, e.g. `https://quiz.example.com`, with no trailing slash or path. |
+| `SESSION_SIGNING_KEY` | Stable, randomly generated secret of at least 32 bytes. Required for a public origin. |
+| `PORT` | Listening port, default `8080`. |
+| `DATABASE_URL` | SQLite JDBC URL on persistent storage, e.g. `jdbc:sqlite:/data/tunegame.db`. |
+
+Generate a signing secret with `openssl rand -hex 32`, save it securely, and retain it across restarts. Local HTTP on `127.0.0.1` or `localhost` can use a temporary key; restarting then invalidates cookies.
+
+Run **one server instance** behind an HTTPS reverse proxy. Keep the application port private. Configure the proxy to limit request bodies to 16 KiB, rate-limit abusive clients, and compress JavaScript responses. The application also limits traffic to 300 requests/minute per socket peer. It deliberately does not trust incoming forwarded-IP headers, so visitors behind one proxy share that application limit. Configure capacity at the proxy before increasing traffic.
+
+Use restricted permissions for the SQLite file and backups; the database holds Spotify refresh tokens. Games and OAuth state are in memory and do not survive restarts. Playlists belong to a signed browser session, not a permanent account; losing that cookie loses access to the saved list. The leaderboard is public, so use a nickname rather than personal information.
+
+### Migration and rollback
+
+Before upgrading an existing deployment, stop the server and back up its SQLite database. Startup migrates playlists to per-session ownership in a transaction. Existing unowned playlists are preserved in the database but hidden from new visitors; users can import them again. This avoids exposing another user's saved playlist.
+
+To roll back, stop the new server, restore the pre-upgrade database backup, and run the previous distribution. The old version must not run against the migrated schema. Rotating the signing key invalidates all browser sessions.
 
 ## API
 
-All paths below are relative to `http://localhost:8080`. Send JSON request bodies with `Content-Type: application/json` where applicable.
+Clients must retain the `tunegame_session` cookie across calls. Games and saved playlists are private to that cookie; scores are public. Request bodies and responses use JSON.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/` | Server health response. |
-| `GET` | `/session` | Create or retrieve the caller's session ID. |
-| `POST` | `/new-game` | Start a default-song game, or a game from a saved Spotify playlist. Optional body: `{"playlistId":"<saved-playlist-id>"}`. |
-| `GET` | `/question?gameId=<id>` | Get the next question. |
-| `POST` | `/answer` | Submit an answer. Body: `{"gameId":"<id>","answer":"<answer>"}`. |
-| `GET` | `/playlist` | List saved Spotify playlists. |
-| `POST` | `/playlist` | Save a Spotify playlist. Body: `{"name":"<name>","spotifyPlaylistId":"<spotify-id>"}`. The server retrieves the playlist name from Spotify. |
-| `DELETE` | `/playlist/{id}` | Delete a saved playlist. |
-| `GET` | `/scores` | List saved high scores. |
-| `POST` | `/scores` | Submit a completed game's score. Body: `{"playerName":"<name>","gameId":"<id>"}`. |
-| `GET` | `/spotify/login` | Begin Spotify OAuth authorization. |
-| `GET` | `/spotify/callback` | Spotify OAuth callback; normally called by Spotify. |
-| `GET` | `/spotify/status` | Check whether the current session is connected to Spotify. |
-| `POST` | `/spotify/logout` | Disconnect Spotify for the current session. |
-| `GET` | `/spotify/search?song=<title>&artist=<name>` | Search Spotify for a track. |
-| `POST` | `/spotify/play?song=<title>&artist=<name>` | Search for and play a track, starting at 30 seconds. |
-| `POST` | `/spotify/pause` | Pause Spotify playback. |
+| GET | `/` | Health response. |
+| GET | `/play/` | Browser game. |
+| GET | `/session` | Create/retrieve the visitor session. |
+| POST | `/new-game` | Start a game; optional `{"playlistId":"saved-id"}`. |
+| GET | `/question?gameId=…` | Retrieve the next question. |
+| POST | `/answer` | Submit `{"gameId":"…","answer":"…"}`. |
+| GET/POST | `/playlist` | List/save the visitor's playlists. |
+| DELETE | `/playlist/{id}` | Delete the visitor's saved playlist. |
+| GET/POST | `/scores` | Public leaderboard / submit a completed game's score once. |
+| GET | `/spotify/login` | Start authorization. |
+| GET | `/spotify/callback` | Authorization callback. |
+| GET | `/spotify/status` | Connection status. |
+| GET | `/spotify/playlists` | Connected user's playlists, as `[{"id":"…","name":"…"}]`; 401 disconnected, 503 upstream failure. |
+| POST | `/spotify/logout` | Disconnect and remove the stored refresh token. |
 
-Spotify authorization and Spotify-backed operations use the same session cookie; clients should retain and send cookies between requests so Spotify remains associated with the same user. A game score can be submitted only once the game is over.
+## Verification
 
-Example game flow:
-
-```bash
-curl -X POST http://localhost:8080/new-game \
-  -H 'Content-Type: application/json' \
-  -d '{}'
-
-curl 'http://localhost:8080/question?gameId=<game-id>'
-
-curl -X POST http://localhost:8080/answer \
-  -H 'Content-Type: application/json' \
-  -d '{"gameId":"<game-id>","answer":"<your-answer>"}'
-```
-
-## Tests
-
-Run the server and shared module tests with:
-
-```bash
-./gradlew :server:test :shared:allTests
-```
+GitHub Actions runs server tests, shared JVM tests, Chrome browser tests, distribution builds, and the installed-server smoke script. It uploads the distributable ZIP and test reports. Make `Release checks / verify` a required branch check before merging. Live Spotify authorization and playback need a separate authorized account/device check; passing mocks does not establish public-launch approval.
