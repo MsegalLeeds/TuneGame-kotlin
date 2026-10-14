@@ -27,3 +27,7 @@ tunegame.db-wal
 
 # Local properties
 local.properties
+# Personal Xcode signing/workspace state
+xcuserdata/
+*.xcuserstate
+DerivedData/

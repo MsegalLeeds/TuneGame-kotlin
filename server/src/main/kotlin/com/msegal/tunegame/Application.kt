@@ -1,5 +1,7 @@
 package com.msegal.tunegame
 
+import com.msegal.tunegame.room.PrivateRooms
+import com.msegal.tunegame.routes.roomRoutes
 import com.msegal.tunegame.game.GameSessionManager
 import com.msegal.tunegame.game.Song
 import com.msegal.tunegame.playlist.PlaylistRepository
@@ -255,7 +257,11 @@ fun Application.module(
         if (playlistRepositoryOverride == null) playlistRepository.close()
     }
 
+    val privateRooms = PrivateRooms(songs)
     routing {
+        roomRoutes(privateRooms)
+        get("/rooms") { call.respondRedirect("/rooms/") }
+        staticResources("/rooms", "web")
         get("/play") { call.respondRedirect("/play/") }
         staticResources("/play", "web")
 

@@ -36,6 +36,7 @@ private val gameClient =
     GameClient(api)
 
 fun main() {
+    if (window.location.pathname.startsWith("/rooms")) return
 
     setupButtons()
     setupSpotifyUi { playlist ->

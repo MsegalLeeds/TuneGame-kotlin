@@ -474,3 +474,7 @@ python3 scripts/smoke_release.py
 Chrome/Chromium is required for browser tests; set `CHROME_BIN` if needed. CI uploads the release ZIP and test reports. The smoke script starts the installed server with a temporary database, verifies packaged browser assets, visitor isolation, three rounds, game over, and score persistence. It never uses Spotify credentials.
 
 Before upgrading an existing deployment, stop the server and back up SQLite. Legacy playlist migration preserves unowned rows but hides them from new sessions. To roll back to the old schema, restore the backup and previous distribution together. Keep SQLite and its Spotify refresh tokens private, and use one server instance behind an HTTPS reverse proxy with request-size and per-client rate limits. Games do not survive restarts; saved playlists belong to a browser session rather than a permanent account.
+
+## Private Android and iOS apps
+
+The apps reuse TuneGame's existing interface and game logic. Private rooms at `/rooms/` let friends answer shared built-in quiz questions on separate devices. See [mobile setup and installation](mobile/README.md) and [room scope](docs/private-mobile.md). The existing solo website remains at `/play/`.
