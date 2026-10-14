@@ -112,7 +112,7 @@ struct GameWebView: UIViewRepresentable {
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let target = action.request.url,
                   target.scheme == url.scheme, target.host == url.host, target.port == url.port,
-                  target.path.hasPrefix("/rooms/") else { decisionHandler(.cancel); return }
+                  target.path == "/rooms" || target.path.hasPrefix("/rooms/") else { decisionHandler(.cancel); return }
             decisionHandler(.allow)
         }
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { error = "" }
