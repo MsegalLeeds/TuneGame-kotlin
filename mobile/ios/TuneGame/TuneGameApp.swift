@@ -11,6 +11,7 @@ struct ServerView: View {
     @State private var destination: URL?
     @State private var error = ""
     @State private var reload = 0
+    @State private var pendingPath: String?
 
     var body: some View {
         NavigationStack {
@@ -21,30 +22,43 @@ struct ServerView: View {
                             Text(error).foregroundStyle(.red).padding().accessibilityLabel(error)
                         }
                         GameWebView(url: destination, reload: reload, error: $error)
+                            .id(destination)
                     }
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button("Server") { self.destination = nil; error = "" }
                         }
                         ToolbarItem(placement: .topBarTrailing) {
-                            Button("Reload", systemImage: "arrow.clockwise") { reload += 1 }
+                            Menu("Games", systemImage: "gamecontroller") {
+                                Button("Main game") { pendingPath = "/play/" }
+                                Button("Private rooms") { pendingPath = "/rooms/" }
+                                Button("Reload", systemImage: "arrow.clockwise") { reload += 1 }
+                            }
                         }
                     }
                 } else {
                     Form {
                         Section {
-                            Text("Play with friends using the same private game server. Games need an internet connection.")
+                            Text("Play the main game or join friends in a private room. Connect to your TuneGame server to begin.")
                             TextField("https://your-server.example", text: $serverURL)
                                 .textContentType(.URL)
                                 .keyboardType(.URL)
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .accessibilityLabel("Private server address")
-                            Button("Open TuneGame") { connect() }
+                            Button("Main game") { connect(path: "/play/") }
+                            Button("Private rooms") { connect(path: "/rooms/") }
                         }
                         if !error.isEmpty { Text(error).foregroundStyle(.red) }
                     }
                 }
+            }
+            .confirmationDialog("Switch games? The current screen will restart. Leave your private room first if you want to leave it.", isPresented: Binding(get: { pendingPath != nil }, set: { if !$0 { pendingPath = nil } }), titleVisibility: .visible) {
+                Button("Switch games") {
+                    if let path = pendingPath { connect(path: path) }
+                    pendingPath = nil
+                }
+                Button("Cancel", role: .cancel) { pendingPath = nil }
             }
             .navigationTitle("TuneGame")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,7 +66,7 @@ struct ServerView: View {
         }
     }
 
-    private func connect() {
+    private func connect(path: String) {
         guard var parts = URLComponents(string: serverURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               let host = parts.host, !host.isEmpty,
               parts.user == nil, parts.password == nil,
@@ -66,9 +80,10 @@ struct ServerView: View {
         allowed = allowed || (parts.scheme == "http" && ["localhost", "127.0.0.1"].contains(host))
         #endif
         guard allowed else { error = "Use HTTPS to connect to your private server."; return }
-        parts.path = "/rooms/"
+        parts.path = path
         guard let url = parts.url else { error = "Check the server address."; return }
         error = ""
+        reload = 0
         destination = url
     }
 }
@@ -93,7 +108,7 @@ struct GameWebView: UIViewRepresentable {
     func updateUIView(_ web: WKWebView, context: Context) {
         if context.coordinator.reload != reload {
             context.coordinator.reload = reload
-            web.reload()
+            web.load(URLRequest(url: url))
         }
     }
 
@@ -112,7 +127,7 @@ struct GameWebView: UIViewRepresentable {
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let target = action.request.url,
                   target.scheme == url.scheme, target.host == url.host, target.port == url.port,
-                  target.path == "/rooms" || target.path.hasPrefix("/rooms/") else { decisionHandler(.cancel); return }
+                  ["/rooms", "/play"].contains(target.path) || target.path.hasPrefix("/rooms/") || target.path.hasPrefix("/play/") else { decisionHandler(.cancel); return }
             decisionHandler(.allow)
         }
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { error = "" }
