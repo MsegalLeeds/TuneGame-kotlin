@@ -2,6 +2,9 @@ package com.msegal.tunegame.spotify
 
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SpotifyAuthTest {
@@ -153,5 +156,37 @@ class SpotifyAuthTest {
                 sessionId = "session-a"
             )
         )
+    }
+
+    @Test
+    fun `mobile ticket expires after five minutes`() {
+        var now = 0L
+        val auth = SpotifyAuth(SpotifyConfig("client", "secret", "https://game.example/spotify/callback"), { now })
+        val ticket = auth.createMobileHandoff("mobile")
+        now = 5 * 60_000L
+        assertNull(auth.beginMobileAuthorization(ticket, "browser"))
+    }
+
+    @Test
+    fun `mobile callback expires after ten minutes and never connects the browser instead`() {
+        var now = 0L
+        val auth = SpotifyAuth(SpotifyConfig("client", "secret", "https://game.example/spotify/callback"), { now })
+        val ticket = auth.createMobileHandoff("mobile")
+        val (_, state) = assertNotNull(auth.beginMobileAuthorization(ticket, "browser"))
+        now = 10 * 60_000L
+        assertNull(auth.consumeAuthorization(state, "browser"))
+    }
+
+    @Test
+    fun `mobile tickets are single use and callbacks are bound to the browser that consumed them`() {
+        val auth = createAuth()
+        val ticket = auth.createMobileHandoff("mobile")
+        val (_, state) = assertNotNull(auth.beginMobileAuthorization(ticket, "browser"))
+        assertNull(auth.beginMobileAuthorization(ticket, "another-browser"))
+        assertNull(auth.beginMobileAuthorization("unknown", "browser"))
+        assertNull(auth.consumeAuthorization(state, "mobile"))
+        assertNull(auth.consumeAuthorization(state, "another-browser"))
+        assertEquals(SpotifyAuth.Authorization("mobile", mobile = true), auth.consumeAuthorization(state, "browser"))
+        assertNull(auth.consumeAuthorization(state, "browser"))
     }
 }

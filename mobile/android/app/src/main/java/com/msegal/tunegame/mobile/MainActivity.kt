@@ -2,6 +2,8 @@ package com.msegal.tunegame.mobile
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.os.Bundle
 import android.net.Uri
 import android.graphics.Color
@@ -12,6 +14,8 @@ import android.widget.*
 /** Native installation shell; all quiz rules and screens remain in the existing web app. */
 class MainActivity : Activity() {
     private var web: WebView? = null
+    private var gameUrl: String? = null
+    private var returningFromSpotify = false
 
     private val preferences by lazy { getSharedPreferences("server", MODE_PRIVATE) }
 
@@ -21,6 +25,8 @@ class MainActivity : Activity() {
     }
 
     private fun setup() {
+        returningFromSpotify = false
+        gameUrl = null
         web?.destroy(); web = null
         val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(32, 64, 32, 32); setBackgroundColor(Color.rgb(13, 17, 15)) }
         val title = TextView(this).apply { text = "TuneGame"; textSize = 32f; setTextColor(Color.rgb(29,185,84)) }
@@ -50,6 +56,8 @@ class MainActivity : Activity() {
     }
 
     private fun showGame(base: Uri, path: String) {
+        gameUrl = base.buildUpon().path(path).build().toString()
+        returningFromSpotify = false
         web?.destroy(); web = null
         val shell = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val toolbar = LinearLayout(this)
@@ -77,7 +85,25 @@ class MainActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     val u = request.url
-                    return u.scheme != base.scheme || u.host != base.host || u.port != base.port || !(u.path in listOf("/rooms", "/play") || u.path.orEmpty().startsWith("/rooms/") || u.path.orEmpty().startsWith("/play/"))
+                    val sameServer = u.scheme == base.scheme && u.host == base.host && u.port == base.port && u.userInfo == null
+                    if (!sameServer || !request.isForMainFrame) return true
+                    if (u.path == "/spotify/login") {
+                        view.loadUrl(base.buildUpon().path("/spotify/mobile/start").build().toString())
+                        return true
+                    }
+                    if (u.path == "/spotify/mobile/authorize") {
+                        CookieManager.getInstance().flush()
+                        try {
+                            returningFromSpotify = true
+                            startActivity(Intent(Intent.ACTION_VIEW, u).addCategory(Intent.CATEGORY_BROWSABLE))
+                        } catch (_: ActivityNotFoundException) {
+                            returningFromSpotify = false
+                            error.text = "Install a browser to connect Spotify, then try again."
+                            error.visibility = android.view.View.VISIBLE
+                        }
+                        return true
+                    }
+                    return !(u.path == "/spotify/mobile/start" || u.path in listOf("/rooms", "/play") || u.path.orEmpty().startsWith("/rooms/") || u.path.orEmpty().startsWith("/play/"))
                 }
                 override fun onPageFinished(view: WebView, url: String) { CookieManager.getInstance().flush() }
                 override fun onReceivedError(view: WebView, request: WebResourceRequest, failure: WebResourceError) {
@@ -101,6 +127,13 @@ class MainActivity : Activity() {
         }
     }
     override fun onPause() { web?.onPause(); super.onPause() }
-    override fun onResume() { super.onResume(); web?.onResume() }
+    override fun onResume() {
+        super.onResume()
+        web?.onResume()
+        if (returningFromSpotify) {
+            returningFromSpotify = false
+            gameUrl?.let { web?.loadUrl(it) }
+        }
+    }
     override fun onDestroy() { web?.destroy(); web=null; super.onDestroy() }
 }

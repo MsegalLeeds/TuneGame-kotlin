@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import SafariServices
 
 @main
 struct TuneGameApp: App {
@@ -12,6 +13,7 @@ struct ServerView: View {
     @State private var error = ""
     @State private var reload = 0
     @State private var pendingPath: String?
+    @State private var spotifySignIn: SpotifySignIn?
 
     var body: some View {
         NavigationStack {
@@ -21,7 +23,7 @@ struct ServerView: View {
                         if !error.isEmpty {
                             Text(error).foregroundStyle(.red).padding().accessibilityLabel(error)
                         }
-                        GameWebView(url: destination, reload: reload, error: $error)
+                        GameWebView(url: destination, reload: reload, error: $error, spotifySignIn: $spotifySignIn)
                             .id(destination)
                     }
                     .toolbar {
@@ -60,6 +62,9 @@ struct ServerView: View {
                 }
                 Button("Cancel", role: .cancel) { pendingPath = nil }
             }
+            .sheet(item: $spotifySignIn, onDismiss: { reload += 1 }) { signIn in
+                SpotifyBrowser(url: signIn.url)
+            }
             .navigationTitle("TuneGame")
             .navigationBarTitleDisplayMode(.inline)
             .tint(Color(red: 0.11, green: 0.72, blue: 0.33))
@@ -92,8 +97,9 @@ struct GameWebView: UIViewRepresentable {
     let url: URL
     let reload: Int
     @Binding var error: String
+    @Binding var spotifySignIn: SpotifySignIn?
 
-    func makeCoordinator() -> Coordinator { Coordinator(url: url, error: $error) }
+    func makeCoordinator() -> Coordinator { Coordinator(url: url, error: $error, spotifySignIn: $spotifySignIn) }
 
     func makeUIView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
@@ -121,14 +127,33 @@ struct GameWebView: UIViewRepresentable {
         let url: URL
         var reload = 0
         @Binding var error: String
-        init(url: URL, error: Binding<String>) { self.url = url; _error = error }
+        @Binding var spotifySignIn: SpotifySignIn?
+        init(url: URL, error: Binding<String>, spotifySignIn: Binding<SpotifySignIn?>) {
+            self.url = url; _error = error; _spotifySignIn = spotifySignIn
+        }
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             guard let target = action.request.url,
                   target.scheme == url.scheme, target.host == url.host, target.port == url.port,
-                  ["/rooms", "/play"].contains(target.path) || target.path.hasPrefix("/rooms/") || target.path.hasPrefix("/play/") else { decisionHandler(.cancel); return }
-            decisionHandler(.allow)
+                  target.user == nil, target.password == nil, action.targetFrame?.isMainFrame == true else { decisionHandler(.cancel); return }
+            if target.path == "/spotify/login" {
+                decisionHandler(.cancel)
+                guard var start = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
+                start.path = "/spotify/mobile/start"
+                start.query = nil
+                start.fragment = nil
+                if let startURL = start.url { webView.load(URLRequest(url: startURL)) }
+                return
+            }
+            if target.path == "/spotify/mobile/authorize" {
+                decisionHandler(.cancel)
+                spotifySignIn = SpotifySignIn(url: target)
+                return
+            }
+            let allowed = target.path == "/spotify/mobile/start" || ["/rooms", "/play"].contains(target.path)
+                || target.path.hasPrefix("/rooms/") || target.path.hasPrefix("/play/")
+            decisionHandler(allowed ? .allow : .cancel)
         }
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { error = "" }
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError failure: Error) {
@@ -144,5 +169,29 @@ struct GameWebView: UIViewRepresentable {
                 decisionHandler(.cancel)
             } else { decisionHandler(.allow) }
         }
+    }
+}
+
+struct SpotifySignIn: Identifiable {
+    let url: URL
+    var id: URL { url }
+}
+
+struct SpotifyBrowser: UIViewControllerRepresentable {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator { Coordinator(dismiss: dismiss) }
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let browser = SFSafariViewController(url: url)
+        browser.delegate = context.coordinator
+        return browser
+    }
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+
+    final class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        let dismiss: DismissAction
+        init(dismiss: DismissAction) { self.dismiss = dismiss }
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) { dismiss() }
     }
 }
