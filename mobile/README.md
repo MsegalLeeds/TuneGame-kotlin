@@ -13,6 +13,16 @@ The browser can use the same feature at `/rooms/`. Existing solo play stays at `
 
 Rooms are temporary: restart ends them, one hour without member activity expires them, and there is an eight-hour absolute limit. Up to eight players may join before the host starts. The room code admits new players; keep it private. Refreshing the page preserves membership using the existing signed session cookie. Clearing app data/cookies or losing a session after an app restart may require creating a new room. Leaving transfers hosting to another player. Switching servers does not automatically leave the previous room; use Leave room first.
 
+## Spotify in the main game
+
+Choose **Main game**, then **connect** beside the Spotify status. Android opens the system browser; iOS opens a Safari sheet. Complete Spotify sign-in, then return to TuneGame on Android or tap **Done** on iOS. The game refreshes and loads playlists for the connected account. Closing sign-in early leaves Spotify disconnected and you can try again. Connecting restarts the main-game screen.
+
+Deploy the updated server together with these app versions. Keep `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET` on the server and register its exact HTTPS `/spotify/callback` URL as `SPOTIFY_REDIRECT_URI` in the Spotify dashboard. The origin entered in the app must match `PUBLIC_URL` and the callback origin, so the browser receives its own session cookie on return. A Spotify account and an available playback device are still required for music playback; this change does not add an on-device player.
+
+The app creates a single-use browser handoff that expires after five minutes. Authorization state expires after ten minutes and is bound to the browser session that starts sign-in. The server saves Spotify tokens against the original app session; it never copies game cookies or Spotify tokens into the browser URL. Handoffs and pending states are in memory, so sign-in must be retried after a server restart. Avoid recording query strings on the handoff and callback paths in proxy access logs.
+
+Automated tests cover separate signed app/browser cookies, session isolation, wrong-browser callbacks, ticket and callback replay, expiry, denial, token exchange failure, and ordinary browser sign-in. Android and iOS simulator builds pass. Live Spotify authorization and device playback still require an end-to-end check with the deployed HTTPS server.
+
 ## Android
 
 From the repository root, with Java 21 and Android SDK 36 installed:
